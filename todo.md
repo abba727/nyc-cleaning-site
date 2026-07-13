@@ -54,4 +54,13 @@
 - [x] Refine the Insights archive into a curated, paginated or grouped experience rather than rendering the entire legacy archive as one undifferentiated card wall.
 - [x] Review browser, network, and server logs for errors after validation flows.
 - [x] Create a content and architecture handoff for the second-step authenticated blog CMS.
-- [ ] Create the final project checkpoint and deliver the website preview and SEO/CMS handoff.
+- [x] Create the final project checkpoint and deliver the website preview and SEO/CMS handoff.
+- [x] Reduce the homepage hero image and first-screen height so the primary content begins substantially sooner on desktop and mobile.
+- [x] Replace repeated or overly similar people across generated imagery with a visibly diverse cast, setting, composition, and activity for each service.
+- [x] Redesign the shared service-detail template into multiple visually distinct sections rather than one continuous copied-content layout.
+- [x] Replace the orange/gold section and button palette with a cohesive alternative aligned to the existing NYC Cleaning blue logo.
+- [x] Preserve existing content and SEO signals while restructuring service pages, including headings, canonical paths, metadata, internal links, and schema.
+- [x] Validate all revised homepage and service-page templates at desktop and mobile breakpoints.
+- [x] Re-run Vitest, TypeScript checks, production build, and relevant route/image audits after the redesign revisions.
+- [x] Explain current backend access and distinguish the implemented inquiry database from the planned Phase 2 editorial CMS.
+- [ ] Save and deliver a new reviewable checkpoint containing all requested revisions.
