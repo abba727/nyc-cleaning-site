@@ -63,4 +63,23 @@
 - [x] Validate all revised homepage and service-page templates at desktop and mobile breakpoints.
 - [x] Re-run Vitest, TypeScript checks, production build, and relevant route/image audits after the redesign revisions.
 - [x] Explain current backend access and distinguish the implemented inquiry database from the planned Phase 2 editorial CMS.
-- [ ] Save and deliver a new reviewable checkpoint containing all requested revisions.
+- [x] Save and deliver a new reviewable checkpoint containing all requested revisions.
+- [x] Reduce the homepage hero to a compact first screen with a shorter headline and substantially less vertical image area on desktop and mobile.
+- [x] Consolidate overlapping service offerings into a concise visitor-facing taxonomy with short, non-repetitive titles that do not append “NYC” unnecessarily.
+- [x] Preserve every legacy service URL through canonical routing, aliases, or redirects while presenting the simplified service taxonomy in navigation and discovery pages.
+- [x] Replace the oversized multi-column services dropdown with a concise grouped menu that is easy to scan on desktop and mobile.
+- [x] Audit every legacy article and assign a distinct, relevant, production-ready image rather than a shared fallback image.
+- [x] Display each article’s image on the Insights archive cards and individual article pages with descriptive alt text.
+- [x] Identify and replace every failed, unresolved, or inappropriate generated-image reference and verify all production assets return valid image responses.
+- [x] Reclassify legacy question-and-answer content as FAQ data and render it consistently with accessible accordion styling across service pages.
+- [x] Remove the ambiguous “complete service information” disclosure and prevent unrelated legacy paragraphs from being presented as checklist items.
+- [x] Add authenticated administrator-only article management with list, create, edit, preview, publish/unpublish, and delete workflows.
+- [x] Add article persistence fields for title, slug, excerpt, body, SEO title, meta description, image URL/key, status, author, and UTC timestamps.
+- [x] Protect all article-management procedures and routes with server-side admin authorization checks.
+- [x] Migrate preserved legacy articles into the editable article database without fabricating content or altering canonical URLs.
+- [x] Add backend media upload support for article images using deployment-safe object storage.
+- [x] Add admin login and logout navigation with clear access instructions for the project owner.
+- [x] Add Vitest coverage for consolidated services, FAQ classification, article CRUD validation, authorization, publishing behavior, and SEO output.
+- [x] Validate homepage, services navigation, Insights imagery, service FAQs, and admin workflows at desktop and mobile breakpoints.
+- [x] Run TypeScript checks, production build, route/image audits, and review runtime logs after the revisions.
+- [x] Save and deliver a new reviewable checkpoint with the admin login path and usage guidance.

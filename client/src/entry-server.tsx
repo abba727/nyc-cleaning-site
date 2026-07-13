@@ -7,7 +7,8 @@ import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
 import App from "./App";
 import { brandAssets } from "./content/assets";
-import { blogArchivePaths, company, getLegacyByPath, getPageByPath, getPageImage, isBlogArchivePath, legacyContent, normalizePath, pages, siteOrigin } from "./content/site";
+import { company, getArticleImage, getLegacyByPath, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
+import { getPublishedArticleByPath } from "../../server/db";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
@@ -16,13 +17,20 @@ export function isKnownPublicPath(url: string) {
   return Boolean(getPageByPath(url) || getLegacyByPath(url) || isBlogArchivePath(url));
 }
 
-export function render(url: string) {
+export async function render(url: string) {
   const pathname = normalizePath(url);
   const matchedPage = getPageByPath(pathname);
   const matchedLegacy = getLegacyByPath(pathname);
   const isSyntheticArchive = isBlogArchivePath(pathname);
+  const cmsArticle = !matchedPage && !isSyntheticArchive ? await getPublishedArticleByPath(pathname) : undefined;
   const page = matchedPage || pages[0];
-  const seo = matchedLegacy ? { path: matchedLegacy.path, title: matchedLegacy.title, description: matchedLegacy.description, h1: matchedLegacy.title, kind: matchedLegacy.kind === "article" ? "blog" : "core" } : isSyntheticArchive ? { path: pathname, title: "Cleaning Insights | NYC Cleaning and Maintenance", description: "Practical cleaning and property-maintenance guidance from NYC Cleaning and Maintenance.", h1: "Cleaning and Property Maintenance Insights", kind: "core" } : page;
+  const seo = cmsArticle
+    ? { path: cmsArticle.path, title: cmsArticle.seoTitle || cmsArticle.title, description: cmsArticle.metaDescription || cmsArticle.excerpt || cmsArticle.description, h1: cmsArticle.title, kind: "blog" }
+    : matchedLegacy
+      ? { path: matchedLegacy.path, title: matchedLegacy.title, description: matchedLegacy.description, h1: matchedLegacy.title, kind: matchedLegacy.kind === "article" ? "blog" : "core" }
+      : isSyntheticArchive
+        ? { path: pathname, title: "Cleaning Insights | NYC Cleaning and Maintenance", description: "Practical cleaning and property-maintenance guidance from NYC Cleaning and Maintenance.", h1: "Cleaning and Property Maintenance Insights", kind: "core" }
+        : page;
   const queryClient = new QueryClient();
   const trpcClient = trpc.createClient({ links: [httpBatchLink({ url: `${siteOrigin}/api/trpc`, transformer: superjson })] });
   const html = renderToString(
@@ -36,10 +44,12 @@ export function render(url: string) {
   );
 
   const canonical = `${siteOrigin}${normalizePath(seo.path)}`;
-  const image = matchedLegacy || isSyntheticArchive ? brandAssets.hero : getPageImage(page);
+  const image = cmsArticle?.coverImageUrl || (matchedLegacy?.kind === "article" ? getArticleImage(matchedLegacy) : matchedLegacy || isSyntheticArchive ? brandAssets.hero : getPageImage(page));
+  const imageUrl = image.startsWith("http") ? image : `${siteOrigin}${image}`;
   const crumbs = [{ name: "Home", item: `${siteOrigin}/` }];
   if (seo.path !== "/") crumbs.push({ name: seo.h1.replace(/\s*\|.*$/, ""), item: canonical });
-  const pageSchema = { "@type": matchedLegacy?.kind === "article" ? "Article" : "WebPage", "@id": `${canonical}#webpage`, url: canonical, name: seo.title, headline: matchedLegacy?.kind === "article" ? seo.h1 : undefined, datePublished: matchedLegacy?.publishedAt || undefined, description: seo.description, isPartOf: { "@id": `${siteOrigin}/#website` } };
+  const isArticle = Boolean(cmsArticle || matchedLegacy?.kind === "article");
+  const pageSchema = { "@type": isArticle ? "Article" : "WebPage", "@id": `${canonical}#webpage`, url: canonical, name: seo.title, headline: isArticle ? seo.h1 : undefined, datePublished: cmsArticle?.publishedAt?.toISOString() || matchedLegacy?.publishedAt || undefined, image: imageUrl, description: seo.description, isPartOf: { "@id": `${siteOrigin}/#website` } };
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
@@ -66,17 +76,17 @@ export function render(url: string) {
     `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />`,
     `<link rel="canonical" href="${canonical}" />`,
     `<meta property="og:locale" content="en_US" />`,
-    `<meta property="og:type" content="${matchedLegacy?.kind === "article" || seo.kind === "blog" ? "article" : "website"}" />`,
+    `<meta property="og:type" content="${isArticle || seo.kind === "blog" ? "article" : "website"}" />`,
     `<meta property="og:site_name" content="${escapeHtml(company.name)}" />`,
     `<meta property="og:title" content="${escapeHtml(seo.title)}" />`,
     `<meta property="og:description" content="${escapeHtml(seo.description)}" />`,
     `<meta property="og:url" content="${canonical}" />`,
-    `<meta property="og:image" content="${siteOrigin}${image}" />`,
+    `<meta property="og:image" content="${imageUrl}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${escapeHtml(seo.title)}" />`,
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}" />`,
-    `<meta name="twitter:image" content="${siteOrigin}${image}" />`,
+    `<meta name="twitter:image" content="${imageUrl}" />`,
     `<script type="application/ld+json">${safeJson(schema)}</script>`,
   ].join("\n    ");
-  return { html, head, status: isKnownPublicPath(pathname) ? 200 : 404 };
+  return { html, head, status: isKnownPublicPath(pathname) || Boolean(cmsArticle) ? 200 : 404 };
 }

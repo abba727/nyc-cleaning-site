@@ -1,6 +1,6 @@
-import { and, count, eq, gt } from "drizzle-orm";
+import { and, count, desc, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { inquiries, InsertInquiry, InsertUser, users } from "../drizzle/schema";
+import { articles, inquiries, InsertArticle, InsertInquiry, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -119,4 +119,52 @@ export async function countRecentInquiriesByEmail(email: string, since: Date) {
     .where(and(eq(inquiries.email, email), gt(inquiries.createdAt, since)));
 
   return rows[0]?.value ?? 0;
+}
+
+export async function listPublishedArticles() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db
+    .select()
+    .from(articles)
+    .where(eq(articles.status, "published"))
+    .orderBy(desc(articles.publishedAt), desc(articles.id));
+}
+
+export async function getPublishedArticleByPath(path: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const rows = await db
+    .select()
+    .from(articles)
+    .where(and(eq(articles.path, path), eq(articles.status, "published")))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listAllArticles() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db.select().from(articles).orderBy(desc(articles.updatedAt), desc(articles.id));
+}
+
+export async function createArticle(input: InsertArticle) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(articles).values(input).$returningId();
+  const id = result[0]?.id;
+  if (!id) throw new Error("Article could not be created");
+  return id;
+}
+
+export async function updateArticle(id: number, input: Partial<InsertArticle>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(articles).set(input).where(eq(articles.id, id));
+}
+
+export async function deleteArticle(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.delete(articles).where(eq(articles.id, id));
 }

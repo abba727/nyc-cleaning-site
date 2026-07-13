@@ -4,8 +4,8 @@ import { render } from "../client/src/entry-server";
 import { legacyArticles } from "../client/src/content/site";
 
 describe("public SEO rendering", () => {
-  it("server-renders a canonical service page with LocalBusiness and breadcrumb schema", () => {
-    const result = render("/services/commercial-cleaning-nyc/");
+  it("server-renders a canonical service page with LocalBusiness and breadcrumb schema", async () => {
+    const result = await render("/services/commercial-cleaning-nyc/");
     expect(result.status).toBe(200);
     expect(result.head).toContain('<link rel="canonical" href="https://www.nyccleaning.co/services/commercial-cleaning-nyc/" />');
     expect(result.head).toContain('"@type":"LocalBusiness"');
@@ -13,10 +13,10 @@ describe("public SEO rendering", () => {
     expect(result.html).toMatch(/Commercial Cleaning/i);
   });
 
-  it("server-renders preserved articles with Article metadata", () => {
+  it("server-renders preserved articles with Article metadata", async () => {
     const article = legacyArticles[0];
     expect(article).toBeDefined();
-    const result = render(article.path);
+    const result = await render(article.path);
     expect(result.status).toBe(200);
     expect(result.head).toContain('<meta property="og:type" content="article" />');
     expect(result.head).toContain('"@type":"Article"');
@@ -24,9 +24,9 @@ describe("public SEO rendering", () => {
     expect(result.html).toContain("NYC cleaning insights");
   });
 
-  it("serves crawler-visible blog archives and real 404 status for unknown routes", () => {
-    expect(render("/blog/").status).toBe(200);
-    expect(render("/a-route-that-does-not-exist/").status).toBe(404);
+  it("serves crawler-visible blog archives and real 404 status for unknown routes", async () => {
+    expect((await render("/blog/")).status).toBe(200);
+    expect((await render("/a-route-that-does-not-exist/")).status).toBe(404);
   });
 
   it.each([
@@ -34,8 +34,8 @@ describe("public SEO rendering", () => {
     ["/about/", "/about-us/"],
     ["/privacy-policy/", "/service-guru-app-privacy-policy/"],
     ["/commercial-cleaning-nyc/", "/services/commercial-cleaning-nyc/"],
-  ])("server-renders public alias %s with canonical destination %s", (alias, canonicalPath) => {
-    const result = render(alias);
+  ])("server-renders public alias %s with canonical destination %s", async (alias, canonicalPath) => {
+    const result = await render(alias);
     expect(result.status).toBe(200);
     expect(result.head).toContain(`<link rel="canonical" href="https://www.nyccleaning.co${canonicalPath}" />`);
   });

@@ -15,6 +15,27 @@
       "when": 1783970216254,
       "tag": "0001_ambitious_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1783980671031,
+      "tag": "0002_amused_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1783980938793,
+      "tag": "0003_kind_polaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1783981012973,
+      "tag": "0004_wooden_inhumans",
+      "breakpoints": true
     }
   ]
 }

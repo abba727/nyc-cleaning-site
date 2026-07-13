@@ -21,15 +21,16 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import { getDashboardAccessState } from "@/lib/adminAccess";
+import { ArrowUpRight, FileText, LogOut, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: FileText, label: "Insights editor", path: "/admin/articles" },
+  { icon: ArrowUpRight, label: "View public site", path: "/" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -43,20 +44,23 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window === "undefined") return DEFAULT_WIDTH;
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
-  const { loading, user } = useAuth();
+  const { loading, user, logout } = useAuth();
+  const accessState = getDashboardAccessState(loading, user);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading) {
+  if (accessState === "loading") {
     return <DashboardLayoutSkeleton />
   }
 
-  if (!user) {
+  if (accessState === "signed-out") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
@@ -65,7 +69,7 @@ export default function DashboardLayout({
               Sign in to continue
             </h1>
             <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Access to this dashboard requires authentication. Continue to launch the login flow.
+              Sign in with the project owner account to manage NYC Cleaning articles. Other accounts cannot open the editor.
             </p>
           </div>
           <Button
@@ -79,6 +83,20 @@ export default function DashboardLayout({
       </div>
     );
   }
+
+  if (accessState === "denied") {
+    return (
+      <div className="admin-access-state">
+        <p className="admin-eyebrow">Owner access</p>
+        <h1>This account does not have administrator access.</h1>
+        <p>Sign in with the project owner account, or promote this account to the admin role from the project database.</p>
+        <Button onClick={logout}>Sign out and use another account</Button>
+        <a href="/">Return to the public site</a>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <SidebarProvider
@@ -110,7 +128,7 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const activeMenuItem = menuItems.find(item => location === item.path || (item.path !== "/" && location.startsWith(item.path)));
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -169,7 +187,7 @@ function DashboardLayoutContent({
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                    NYC Cleaning CMS
                   </span>
                 </div>
               ) : null}

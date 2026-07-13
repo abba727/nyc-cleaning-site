@@ -5,7 +5,7 @@ export const brandAssets = {
   careers: "/manus-storage/nyc-cleaning-careers-v2_55866292.png",
   contact: "/manus-storage/nyc-cleaning-contact-v2_f579150a.png",
   serviceArea: "/manus-storage/nyc-cleaning-service-area-v2_f9738d26.png",
-  commercialCleaning: "/manus-storage/nyc-cleaning-commercial-cleaning-v2_0203dcc6.png",
+  commercialCleaning: "/manus-storage/nyc-cleaning-editorial-corrected_d52b94b5.png",
   deepCleaning: "/manus-storage/nyc-cleaning-deep-cleaning-v2_f503466f.png",
   commonArea: "/manus-storage/nyc-cleaning-common-area-v2_94e14b83.png",
   staffing: "/manus-storage/nyc-cleaning-staffing-v2_30b09bf9.png",

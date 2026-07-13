@@ -1,5 +1,6 @@
 import rawSiteData from "./site-data.json";
 import rawLegacyContent from "./legacy-articles.json";
+import rawArticleImages from "./article-images.json";
 import { brandAssets } from "./assets";
 
 export type SitePage = {
@@ -33,9 +34,67 @@ export type LegacyContent = {
 
 export const pages = rawSiteData.pages as SitePage[];
 export const services = pages.filter(page => page.kind === "service");
+const serviceLabelByPath: Record<string, string> = {
+  "/services/common-area-maintenance-services-nyc/": "Common Area Maintenance",
+  "/services/janitorial-staffing-nyc/": "Janitorial Staffing",
+  "/services/house-cleaning-service-nyc/": "House Cleaning",
+  "/services/deep-cleaning-services-nyc/": "Deep Cleaning",
+  "/services/property-maintenance-services-nyc/": "Property Maintenance",
+  "/services/building-repair-and-maintenance-services-nyc/": "Repairs & Maintenance",
+  "/services/commercial-building-maintenance-nyc/": "Commercial Building Care",
+  "/services/commercial-janitorial-cleaning-services-nyc/": "Commercial Janitorial",
+  "/services/janitorial-services-nyc/": "Janitorial Services",
+  "/services/building-maintenance-management-nyc/": "Maintenance Management",
+  "/services/building-maintenance-nyc/": "Building Maintenance",
+  "/services/doorman-services-nyc/": "Doorman Services",
+  "/services/garbage-bin-cleaning-nyc/": "Bin Cleaning",
+  "/services/janitorial-office-cleaning-services-nyc/": "Office Janitorial",
+  "/services/maintenance-staffing-nyc/": "Maintenance Staffing",
+  "/services/office-commercial-cleaning-services-nyc/": "Office Cleaning",
+  "/services/porter-services-nyc/": "Porter Services",
+  "/services/apartment-cleaning-services-nyc/": "Apartment Cleaning",
+  "/services/commercial-cleaning-nyc/": "Commercial Cleaning",
+  "/services/doorman-nyc/": "Doorman Services",
+  "/services/commercial-cleaning-services-prices-nyc/": "Cleaning Pricing",
+  "/services/property-cleaning-services-nyc/": "Property Cleaning",
+  "/services/sweeping-trash-nyc/": "Sweeping & Trash Removal",
+};
+
+export const featuredServicePaths = [
+  "/services/commercial-cleaning-nyc/",
+  "/services/office-commercial-cleaning-services-nyc/",
+  "/services/apartment-cleaning-services-nyc/",
+  "/services/deep-cleaning-services-nyc/",
+  "/services/porter-services-nyc/",
+  "/services/common-area-maintenance-services-nyc/",
+  "/services/property-maintenance-services-nyc/",
+  "/services/building-repair-and-maintenance-services-nyc/",
+  "/services/janitorial-staffing-nyc/",
+  "/services/doorman-services-nyc/",
+  "/services/sweeping-trash-nyc/",
+  "/services/garbage-bin-cleaning-nyc/",
+  "/services/building-maintenance-management-nyc/",
+] as const;
+
+export const featuredServices = featuredServicePaths
+  .map(path => services.find(service => service.path === path))
+  .filter((service): service is SitePage => Boolean(service));
+
+export const serviceGroups = [
+  { label: "Cleaning", paths: featuredServicePaths.slice(0, 4) },
+  { label: "Building care", paths: featuredServicePaths.slice(4, 8) },
+  { label: "Staffing & entry", paths: featuredServicePaths.slice(8, 10) },
+  { label: "Specialty", paths: featuredServicePaths.slice(10, 13) },
+].map(group => ({
+  ...group,
+  services: group.paths
+    .map(path => services.find(service => service.path === path))
+    .filter((service): service is SitePage => Boolean(service)),
+}));
 export const legacyContent = rawLegacyContent as LegacyContent[];
 export const legacyArticles = legacyContent.filter(item => item.kind === "article");
 export const legacyArchives = legacyContent.filter(item => item.kind === "archive");
+const articleImages = rawArticleImages as Record<string, { src: string; alt: string }>;
 export const blogArchivePaths = ["/blog/", "/category/blog/", "/category/cleaning-services/", "/category/uncategorized/"];
 
 export const normalizePath = (path: string) => {
@@ -56,6 +115,8 @@ export const getPageByPath = (path: string) => {
   return pages.find(page => normalizePath(page.path) === canonicalPath);
 };
 export const getLegacyByPath = (path: string) => legacyContent.find(item => normalizePath(item.path) === normalizePath(path));
+export const getArticleImage = (content: LegacyContent) => articleImages[normalizePath(content.path)]?.src || brandAssets.hero;
+export const getArticleImageAlt = (content: LegacyContent) => articleImages[normalizePath(content.path)]?.alt || `Editorial image for ${content.title}`;
 
 export const articlesForArchive = (path: string) => {
   const match = normalizePath(path).match(/^\/(\d{4})\/(\d{2})\/$/);
@@ -119,10 +180,11 @@ export const pageParagraphs = (page: SitePage) => {
 };
 
 export const serviceName = (page: SitePage) =>
-  page.h1
+  serviceLabelByPath[page.path] || page.h1
     .replace(/\s*\|.*$/, "")
     .replace(/\s+in New York.*$/i, "")
     .replace(/\s+in NYC.*$/i, "")
+    .replace(/\s+NYC$/i, "")
     .trim();
 
 export const siteOrigin = "https://www.nyccleaning.co";

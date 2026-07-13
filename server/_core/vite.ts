@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
-import { isKnownPublicPath, render as renderProduction } from "../../client/src/entry-server";
+import { render as renderProduction } from "../../client/src/entry-server";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -38,7 +38,7 @@ export async function setupVite(app: Express, server: Server) {
       template = template.replace(`src="/src/entry-client.tsx"`, `src="/src/entry-client.tsx?v=${nanoid()}"`);
       template = await vite.transformIndexHtml(url, template);
       const entry = await vite.ssrLoadModule("/src/entry-server.tsx");
-      const rendered = entry.render(url) as { html: string; head: string; status: number };
+      const rendered = await entry.render(url) as { html: string; head: string; status: number };
       const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
       res.status(rendered.status).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
@@ -64,9 +64,9 @@ export function serveStatic(app: Express) {
   app.use("*", async (req, res, next) => {
     try {
       const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
-      const rendered = renderProduction(req.originalUrl);
+      const rendered = await renderProduction(req.originalUrl);
       const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
-      res.status(isKnownPublicPath(req.originalUrl) ? 200 : 404).set({ "Content-Type": "text/html" }).end(page);
+      res.status(rendered.status).set({ "Content-Type": "text/html" }).end(page);
     } catch (error) {
       next(error);
     }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, Phone, X } from "lucide-react";
 import { brandAssets } from "@/content/assets";
-import { company, services, serviceName } from "@/content/site";
+import { company, serviceGroups, serviceName } from "@/content/site";
 
 const mainLinks = [
   { href: "/", label: "Home" },
@@ -37,9 +37,8 @@ export function SiteHeader() {
                   Services <ChevronDown size={15} aria-hidden="true" />
                 </Link>
                 <div className="service-menu">
-                  <div className="service-menu-grid">
-                    {services.map(service => <Link key={service.path} href={service.path}>{serviceName(service)}</Link>)}
-                  </div>
+                  <div className="service-menu-grid">{serviceGroups.map(group => <div className="service-menu-group" key={group.label}><p>{group.label}</p>{group.services.map(service => <Link key={service.path} href={service.path}>{serviceName(service)}</Link>)}</div>)}</div>
+                  <Link href="/cleaning-service-nyc/" className="service-menu-all">View all services</Link>
                 </div>
               </div>
             ) : (
@@ -60,9 +59,7 @@ export function SiteHeader() {
         <nav id="mobile-menu" className="mobile-nav" aria-label="Mobile navigation">
           <div className="container mobile-nav-inner">
             {mainLinks.map(link => <Link key={link.href} href={link.href} onClick={() => setOpen(false)}>{link.label}</Link>)}
-            <div className="mobile-services">
-              {services.map(service => <Link key={service.path} href={service.path} onClick={() => setOpen(false)}>{serviceName(service)}</Link>)}
-            </div>
+            <div className="mobile-services">{serviceGroups.map(group => <div className="mobile-service-group" key={group.label}><p>{group.label}</p>{group.services.map(service => <Link key={service.path} href={service.path} onClick={() => setOpen(false)}>{serviceName(service)}</Link>)}</div>)}</div>
             <Link href="/contact/" className="button button-gold" onClick={() => setOpen(false)}>Request a Quote</Link>
           </div>
         </nav>

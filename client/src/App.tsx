@@ -1,17 +1,26 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
+import DashboardLayout from "./components/DashboardLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import ArticleAdmin from "./pages/ArticleAdmin";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route component={Home} />
+      <Route path="/admin"><DashboardLayout><ArticleAdmin /></DashboardLayout></Route>
+      <Route path="/admin/articles"><DashboardLayout><ArticleAdmin /></DashboardLayout></Route>
+      <Route>
+        <div className="site-shell">
+          <SiteHeader />
+          <main><Home /></main>
+          <SiteFooter />
+        </div>
+      </Route>
     </Switch>
   );
 }
@@ -28,13 +37,9 @@ function App() {
         defaultTheme="light"
         // switchable
       >
-        <TooltipProvider>
-          <Toaster />
-          <div className="site-shell">
-            <SiteHeader />
-            <main><Router /></main>
-            <SiteFooter />
-          </div>
+          <TooltipProvider>
+            <Toaster />
+          <Router />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
