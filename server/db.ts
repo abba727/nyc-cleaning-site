@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, count, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { inquiries, InsertInquiry, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,34 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function createInquiry(input: InsertInquiry) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  const result = await db.insert(inquiries).values(input).$returningId();
+  const id = result[0]?.id;
+  if (!id) throw new Error("Inquiry could not be created");
+  return id;
+}
+
+export async function updateInquiryNotificationStatus(
+  id: number,
+  notificationStatus: "sent" | "failed",
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.update(inquiries).set({ notificationStatus }).where(eq(inquiries.id, id));
+}
+
+export async function countRecentInquiriesByEmail(email: string, since: Date) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  const rows = await db
+    .select({ value: count() })
+    .from(inquiries)
+    .where(and(eq(inquiries.email, email), gt(inquiries.createdAt, since)));
+
+  return rows[0]?.value ?? 0;
+}

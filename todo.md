@@ -1,0 +1,57 @@
+# Project TODO
+
+- [x] Initialize the NYC Cleaning full-stack web project.
+- [x] Inventory every public route, page section, service, form, media asset, metadata field, and internal link on the live nyccleaning.co website.
+- [x] Extract and inspect the supplied Websiteredesignproject.zip package, including routes, components, copy, logos, images, and placeholder assets.
+- [x] Save a sitewide live-website inventory of all discovered internal links and first-party media references.
+- [x] Document the redesign archive’s shared styles, runtime, logo treatment, placeholder mechanism, and absence of production image assets.
+- [x] Build a content-parity matrix proving that no live-site or redesign-package content is omitted.
+- [x] Expand the parity matrix to map every redesign prototype page and section to a destination route or documented exclusion.
+- [x] Add every sitemap-derived blog/article URL and indexed content URL to the parity matrix with an explicit preservation or redirect decision.
+- [x] Record section-level parity for each route, including hero, narrative, services, trust, FAQ, contact CTA, and footer/NAP treatment.
+- [x] Add a route-by-route section coverage table for hero, narrative, services, trust, FAQ, contact CTA, and footer/NAP, with each section’s source identified.
+- [x] Preserve and use the existing NYC Cleaning logo in the sticky desktop and mobile navigation.
+- [x] Define a brand-aligned responsive design system covering color, typography, spacing, controls, imagery, and accessible interaction states.
+- [x] Implement a sticky desktop navigation with service links and a prominent quote/contact CTA.
+- [x] Implement an accessible mobile hamburger navigation with keyboard operation and visible focus states.
+- [x] Recreate the Home page with content parity, conversion-focused hero content, calls to action, services, trust content, and genuine source reviews only.
+- [x] Recreate the Services overview page with all services found in the live site and redesign package.
+- [x] Recreate every individual service page found in the live site or redesign package with content parity.
+- [x] Recreate the About page with company story, team information, and only source-verified trust claims or badges.
+- [x] Recreate the Contact page with complete NAP information and an accessible inquiry form.
+- [x] Recreate every additional public page found during the audit, including legal, FAQ, location, landing, and blog pages when present.
+- [x] Preserve every genuine legacy blog/article URL as a crawler-visible static article route with its audited title, metadata, and body content until the phase-two CMS replaces it.
+- [x] Exclude WordPress upload URLs, feeds, API endpoints, author archives, and query-string utility endpoints from the new page sitemap.
+- [x] Generate a brand-consistent NYC cleaning hero image with no embedded text or logo distortion.
+- [x] Generate a distinct, brand-consistent image for every service card and service page that requires one.
+- [x] Generate a brand-consistent About section image and replace every remaining placeholder visual.
+- [x] Store generated and extracted media outside the repository and reference uploaded web assets by their deployment-safe URLs.
+- [x] Verify every generated image resolves to a finalized production asset rather than a pending or failed placeholder.
+- [x] Add a route-by-route and service-by-service image coverage map proving that every card and page has an assigned branded visual.
+- [x] Replace all redesign placeholder visuals in implemented page components and verify no placeholder patterns remain.
+- [x] Implement semantic HTML5 landmarks, logical headings, descriptive link text, accessible form labels, and useful image alt text.
+- [x] Implement unique page titles and meta descriptions for every indexable route.
+- [x] Implement canonical URLs and Open Graph/Twitter social metadata for every indexable route.
+- [x] Implement crawler-visible SEO rendering suitable for public search indexing and social link previews.
+- [x] Implement valid LocalBusiness structured data using only verified company facts.
+- [x] Implement BreadcrumbList and service/page structured data where appropriate and factually supported.
+- [x] Add production-ready robots.txt and sitemap.xml covering all intended indexable routes.
+- [x] Preserve important existing URL paths and document any unavoidable 301 redirects in an SEO migration map.
+- [x] Implement footer NAP, service links, source-verified social links, and dynamic copyright information.
+- [x] Add a database schema for contact and quote inquiries with UTC timestamps, status, service interest, and visitor contact fields.
+- [x] Apply and verify the inquiry database migration.
+- [x] Implement a public, validated, spam-resistant inquiry submission procedure.
+- [x] Implement contact and quote forms with name, email, phone, service type, and message fields.
+- [x] Persist every valid form submission in the database and return clear success and error states.
+- [x] Trigger an owner email notification for each successful inquiry with the visitor’s name, contact details, and service interest.
+- [x] Ensure owner notification failure is logged and handled without losing the persisted inquiry.
+- [x] Add unit tests for route/content configuration, SEO metadata, form validation, database persistence behavior, and notification payloads.
+- [x] Run TypeScript checks, Vitest, and production build successfully.
+- [x] Verify all public routes visually at desktop and mobile breakpoints.
+- [x] Verify navigation, forms, focus handling, contrast, responsive behavior, and form visibility on mobile.
+- [x] Fix public route resolution so About, Services overview, Privacy, and other requested core destinations never fall through to the 404 template.
+- [x] Add intentional aliases or redirects for user-expected core URLs such as /services/ and /privacy-policy/ while preserving canonical legacy URLs.
+- [x] Refine the Insights archive into a curated, paginated or grouped experience rather than rendering the entire legacy archive as one undifferentiated card wall.
+- [x] Review browser, network, and server logs for errors after validation flows.
+- [x] Create a content and architecture handoff for the second-step authenticated blog CMS.
+- [ ] Create the final project checkpoint and deliver the website preview and SEO/CMS handoff.

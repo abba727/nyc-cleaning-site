@@ -1,0 +1,28 @@
+export const brandAssets = {
+  logo: "/manus-storage/nyc-cleaning-logo_aabc7372.webp",
+  hero: "/manus-storage/nyc-cleaning-hero_b6c2dfb6.png",
+  aboutTeam: "/manus-storage/nyc-cleaning-about-team_d3419681.png",
+  careers: "/manus-storage/nyc-cleaning-careers_ac798c5e.png",
+  contact: "/manus-storage/nyc-cleaning-contact_13fa8207.png",
+  serviceArea: "/manus-storage/nyc-cleaning-service-area_7eb99c4d.png",
+  commercialCleaning: "/manus-storage/nyc-cleaning-commercial-cleaning_5c2674f8.png",
+  deepCleaning: "/manus-storage/nyc-cleaning-deep-cleaning_16753e4a.png",
+  commonArea: "/manus-storage/nyc-cleaning-common-area_77c37846.png",
+  staffing: "/manus-storage/nyc-cleaning-staffing_2b3efdf1.png",
+  houseCleaning: "/manus-storage/nyc-cleaning-house-cleaning_953884fe.png",
+  propertyMaintenance: "/manus-storage/nyc-cleaning-property-maintenance_df5f9a39.png",
+  repair: "/manus-storage/nyc-cleaning-repair_294d81e2.png",
+  buildingMaintenance: "/manus-storage/nyc-cleaning-building-maintenance_73df1443.png",
+  janitorial: "/manus-storage/nyc-cleaning-janitorial_69f63da6.png",
+  maintenanceManagement: "/manus-storage/nyc-cleaning-maintenance-management_479417f7.png",
+  doorman: "/manus-storage/nyc-cleaning-doorman_995a61c1.png",
+  garbageBin: "/manus-storage/nyc-cleaning-garbage-bin_59f984bc.png",
+  officeCleaning: "/manus-storage/nyc-cleaning-office-cleaning_8a3bf05e.png",
+  porter: "/manus-storage/nyc-cleaning-porter_78b087ee.png",
+  apartmentCleaning: "/manus-storage/nyc-cleaning-apartment-cleaning_914951b2.png",
+  pricing: "/manus-storage/nyc-cleaning-pricing_c347a4ca.png",
+  propertyCleaning: "/manus-storage/nyc-cleaning-property-cleaning_ab9074c3.png",
+  sweepingTrash: "/manus-storage/nyc-cleaning-sweeping-trash_d79882a4.png",
+} as const;
+
+export type BrandAssetKey = keyof typeof brandAssets;

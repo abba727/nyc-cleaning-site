@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { isKnownPublicPath, render as renderProduction } from "../../client/src/entry-server";
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -34,12 +35,12 @@ export async function setupVite(app: Express, server: Server) {
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      template = template.replace(`src="/src/entry-client.tsx"`, `src="/src/entry-client.tsx?v=${nanoid()}"`);
+      template = await vite.transformIndexHtml(url, template);
+      const entry = await vite.ssrLoadModule("/src/entry-server.tsx");
+      const rendered = entry.render(url) as { html: string; head: string; status: number };
+      const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
+      res.status(rendered.status).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -58,10 +59,16 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  app.use("*", async (req, res, next) => {
+    try {
+      const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
+      const rendered = renderProduction(req.originalUrl);
+      const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
+      res.status(isKnownPublicPath(req.originalUrl) ? 200 : 404).set({ "Content-Type": "text/html" }).end(page);
+    } catch (error) {
+      next(error);
+    }
   });
 }
