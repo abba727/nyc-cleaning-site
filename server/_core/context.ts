@@ -20,6 +20,21 @@ export type TrpcContext = {
   user: CmsContextUser | null;
 };
 
+function readBearerToken(header: string | string[] | undefined) {
+  const value = Array.isArray(header) ? header[0] : header;
+  const match = value?.match(/^Bearer\s+([^\s]+)$/i);
+  return match?.[1];
+}
+
+async function verifyOptionalCmsSessionToken(token: string | undefined) {
+  if (!token) return null;
+  try {
+    return await verifyCmsSessionToken(token);
+  } catch {
+    return null;
+  }
+}
+
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
@@ -27,7 +42,9 @@ export async function createContext(
 
   try {
     const requestCookies = opts.req.cookies ?? parseCookieHeader(opts.req.headers.cookie ?? "");
-    const claims = await verifyCmsSessionToken(requestCookies[COOKIE_NAME]);
+    const cookieClaims = await verifyOptionalCmsSessionToken(requestCookies[COOKIE_NAME]);
+    const claims = cookieClaims
+      ?? await verifyOptionalCmsSessionToken(readBearerToken(opts.req.headers.authorization));
     if (claims) {
       const current = await getCmsUserById(claims.userId);
       if (current && current.sessionVersion === claims.sessionVersion) {

@@ -25,6 +25,7 @@ vi.mock("./cmsDb", () => cmsDbMocks);
 vi.mock("./cmsEmail", () => emailMocks);
 
 import { appRouter } from "./routers";
+import { hashPassword } from "./cmsAuth";
 
 function context(role: "admin" | "content_manager" | null, id = 2): TrpcContext {
   return {
@@ -125,6 +126,43 @@ describe("CMS user-management procedures", () => {
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(caller.cmsUsers.remove({ userId: 2 }))
       .rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("CMS login token transport", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("returns the signed session token and requested persistence mode after valid credentials", async () => {
+    cmsDbMocks.getCredentialByEmail.mockResolvedValue({
+      userId: 12,
+      email: "editor@example.com",
+      name: "Editor",
+      role: "content_manager",
+      status: "active",
+      isPrimaryAdmin: false,
+      passwordHash: await hashPassword("ValidPassword!"),
+      deletedAt: null,
+      sessionVersion: 4,
+    });
+    cmsDbMocks.recordLoginResult.mockResolvedValue(undefined);
+
+    const result = await appRouter.createCaller(context(null)).auth.login({
+      email: "editor@example.com",
+      password: "ValidPassword!",
+      rememberMe: true,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      token: expect.any(String),
+      rememberMe: true,
+    });
+    expect(result.token.split(".")).toHaveLength(3);
+    expect(cmsDbMocks.recordLoginResult).toHaveBeenCalledWith({
+      userId: 12,
+      email: "editor@example.com",
+      success: true,
+    });
   });
 });
 

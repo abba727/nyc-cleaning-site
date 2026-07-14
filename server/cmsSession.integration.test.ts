@@ -43,4 +43,57 @@ describe("CMS login session persistence", () => {
       sessionVersion: 3,
     });
   });
+
+  it("authenticates through a Bearer token when the browser sends no cookies", async () => {
+    mocks.getCmsUserById.mockResolvedValue({
+      id: 41,
+      openId: "cms:41",
+      name: "Primary Administrator",
+      email: "admin@example.com",
+      role: "admin",
+      isPrimaryAdmin: true,
+      sessionVersion: 3,
+    });
+    const token = await createCmsSessionToken({ userId: 41, sessionVersion: 3 }, false);
+
+    const context = await createContext({
+      req: {
+        headers: { authorization: `Bearer ${token}` },
+      },
+      res: {},
+    } as Parameters<typeof createContext>[0]);
+
+    expect(mocks.getCmsUserById).toHaveBeenCalledWith(41);
+    expect(context.user).toMatchObject({
+      id: 41,
+      email: "admin@example.com",
+      role: "admin",
+      sessionVersion: 3,
+    });
+  });
+
+  it("falls back to a valid Bearer token when a stale cookie is present", async () => {
+    mocks.getCmsUserById.mockResolvedValue({
+      id: 41,
+      openId: "cms:41",
+      name: "Primary Administrator",
+      email: "admin@example.com",
+      role: "admin",
+      isPrimaryAdmin: true,
+      sessionVersion: 3,
+    });
+    const token = await createCmsSessionToken({ userId: 41, sessionVersion: 3 }, true);
+
+    const context = await createContext({
+      req: {
+        headers: {
+          cookie: `${COOKIE_NAME}=stale-cookie-value`,
+          authorization: `Bearer ${token}`,
+        },
+      },
+      res: {},
+    } as Parameters<typeof createContext>[0]);
+
+    expect(context.user).toMatchObject({ id: 41, role: "admin", sessionVersion: 3 });
+  });
 });

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { storeCmsSessionToken } from "@/lib/cmsSessionToken";
 import { normalizeCmsEmail, readRememberedCmsEmail, updateRememberedCmsEmail } from "@/lib/rememberedEmail";
 import { trpc } from "@/lib/trpc";
 import { Loader2, LockKeyhole } from "lucide-react";
@@ -25,13 +26,14 @@ export default function AdminLogin() {
   }, []);
 
   const login = trpc.auth.login.useMutation({
-    onSuccess: async () => {
+    onSuccess: async result => {
       setSessionError(null);
+      storeCmsSessionToken(window.sessionStorage, window.localStorage, result.token, result.rememberMe);
       try {
         await utils.auth.me.invalidate();
         const user = await utils.auth.me.fetch();
         if (!user) {
-          setSessionError("Your password was accepted, but the secure session could not be started. Please allow cookies for this site and try again.");
+          setSessionError("Your password was accepted, but the secure session could not be verified. Please reload the page or try again.");
           return;
         }
 

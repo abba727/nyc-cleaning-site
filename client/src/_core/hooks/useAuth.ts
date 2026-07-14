@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { clearCmsSessionToken } from "@/lib/cmsSessionToken";
 import { useCallback, useEffect, useMemo } from "react";
 
 type UseAuthOptions = {
@@ -25,6 +26,7 @@ export function useAuth(options?: UseAuthOptions) {
     try {
       await logoutMutation.mutateAsync();
     } finally {
+      clearCmsSessionToken(window.sessionStorage, window.localStorage);
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
     }

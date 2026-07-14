@@ -160,7 +160,7 @@ export const appRouter = router({
       await recordLoginResult({ userId: credential.userId, email, success: true });
       const token = await createCmsSessionToken({ userId: credential.userId, sessionVersion: credential.sessionVersion }, input.rememberMe);
       setCmsSessionCookie(ctx, token, input.rememberMe);
-      return { success: true } as const;
+      return { success: true, token, rememberMe: input.rememberMe } as const;
     }),
     register: publicProcedure.input(z.object({
       email: emailInput,
