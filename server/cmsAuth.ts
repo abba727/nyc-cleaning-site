@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import argon2 from "argon2";
 import { jwtVerify, SignJWT } from "jose";
+import { isCmsPasswordStrong } from "@shared/cmsPassword";
 import { ENV } from "./_core/env";
 
 export const CMS_SESSION_KIND = "nyc-cleaning-cms";
@@ -118,5 +119,5 @@ export async function verifyCmsSessionToken(token: string | undefined | null): P
 }
 
 export function isStrongPassword(password: string) {
-  return password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
+  return isCmsPasswordStrong(password);
 }

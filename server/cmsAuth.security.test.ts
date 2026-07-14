@@ -19,11 +19,12 @@ describe("CMS authentication primitives", () => {
     expect(normalizeEmail("  Editor@Example.COM ")).toBe("editor@example.com");
   });
 
-  it("requires long mixed-complexity passwords", () => {
-    expect(isStrongPassword("shortA1!")).toBe(false);
-    expect(isStrongPassword("alllowercase123!")).toBe(false);
-    expect(isStrongPassword("NoNumbersOrSymbols")).toBe(false);
-    expect(isStrongPassword("Secure CMS 2026!")).toBe(true);
+  it("requires eight characters, one uppercase letter, and one special character", () => {
+    expect(isStrongPassword("A!bcdef")).toBe(false);
+    expect(isStrongPassword("alllowercase!")).toBe(false);
+    expect(isStrongPassword("NoSpecialCharacter1")).toBe(false);
+    expect(isStrongPassword("Abcdefg!")).toBe(true);
+    expect(isStrongPassword("ADMIN!OK")).toBe(true);
   });
 
   it("hashes passwords with Argon2 and verifies without exposing the password", async () => {

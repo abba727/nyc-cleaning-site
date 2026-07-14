@@ -136,3 +136,8 @@
 - [x] Validate the code-based email flows, production build, responsive CMS routes, and provider acceptance before publishing.
 - [x] Publish the code-based authentication checkpoint and provide updated administrator instructions.
 - [x] Preserve the generic forgot-password response when primary-administrator setup is requested again during the resend cooldown.
+- [x] Replace the single CMS verification-code input with six compact numeric boxes that support paste, mobile autofill, keyboard navigation, and accessible labeling.
+- [x] Simplify CMS passwords to a minimum of eight characters with at least one uppercase letter and one special character, consistently across client and server validation.
+- [x] Improve invalid, expired, superseded, and over-attempt verification-code guidance without weakening generic security responses.
+- [x] Add regression coverage and responsive visual validation for the revised code-entry and password-reset/setup flows.
+- [x] Publish the corrected CMS credential experience and provide updated administrator instructions.

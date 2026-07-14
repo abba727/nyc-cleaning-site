@@ -177,3 +177,77 @@ describe("CMS password recovery privacy", () => {
     expect(emailMocks.sendPrimaryAdminSetupEmail).not.toHaveBeenCalled();
   });
 });
+
+describe("CMS password code completion", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("completes a normal active-account password reset with the simplified password policy", async () => {
+    cmsDbMocks.getCredentialByEmail.mockResolvedValue({
+      userId: 8,
+      email: "editor@example.com",
+      name: "Editor",
+      role: "content_manager",
+      status: "active",
+      isPrimaryAdmin: false,
+      passwordHash: "existing-hash",
+      deletedAt: null,
+    });
+    cmsDbMocks.completePasswordReset.mockResolvedValue({ success: true });
+
+    await expect(appRouter.createCaller(context(null)).auth.resetPassword({
+      email: "editor@example.com",
+      code: "276858",
+      password: "Abcdefg!",
+    })).resolves.toEqual({ success: true });
+
+    expect(cmsDbMocks.completePasswordReset).toHaveBeenCalledWith(expect.objectContaining({
+      email: "editor@example.com",
+      code: "276858",
+      passwordHash: expect.stringMatching(/^\$argon2id\$/),
+    }));
+    expect(cmsDbMocks.acceptInvitation).not.toHaveBeenCalled();
+  });
+
+  it("uses a primary-administrator setup code from the reset screen when that account is not yet active", async () => {
+    cmsDbMocks.getCredentialByEmail.mockResolvedValue({
+      userId: 1,
+      email: "albert.aranbaev@gmail.com",
+      name: "Albert Aranbaev",
+      role: "admin",
+      status: "invited",
+      isPrimaryAdmin: true,
+      passwordHash: null,
+      deletedAt: null,
+    });
+    cmsDbMocks.acceptInvitation.mockResolvedValue({ id: 1, sessionVersion: 1 });
+
+    await expect(appRouter.createCaller(context(null)).auth.resetPassword({
+      email: "albert.aranbaev@gmail.com",
+      code: "276858",
+      password: "Abcdefg!",
+    })).resolves.toEqual({ success: true });
+
+    expect(cmsDbMocks.acceptInvitation).toHaveBeenCalledWith(expect.objectContaining({
+      email: "albert.aranbaev@gmail.com",
+      code: "276858",
+      name: "Albert Aranbaev",
+      passwordHash: expect.stringMatching(/^\$argon2id\$/),
+    }));
+    expect(cmsDbMocks.completePasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("rejects passwords without both an uppercase letter and a special character", async () => {
+    await expect(appRouter.createCaller(context(null)).auth.resetPassword({
+      email: "editor@example.com",
+      code: "276858",
+      password: "lowercase!",
+    })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "Use at least 8 characters with one uppercase letter and one special character.",
+    });
+
+    expect(cmsDbMocks.getCredentialByEmail).not.toHaveBeenCalled();
+    expect(cmsDbMocks.completePasswordReset).not.toHaveBeenCalled();
+    expect(cmsDbMocks.acceptInvitation).not.toHaveBeenCalled();
+  });
+});

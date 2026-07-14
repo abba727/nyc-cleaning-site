@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, deleteArticle, getPublishedArticleByPath, listAllArticles, listPublishedArticles, updateArticle, updateInquiryNotificationStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
@@ -85,7 +86,7 @@ const articleInput = z.object({
 
 const cmsRole = z.enum(["admin", "content_manager"]);
 const emailInput = z.string().trim().toLowerCase().email().max(320);
-const passwordInput = z.string().min(12).max(128);
+const passwordInput = z.string().min(CMS_PASSWORD_MIN_LENGTH).max(128);
 const verificationCodeInput = z.string().regex(/^\d{6}$/, "Enter the six-digit code.");
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 let dummyPasswordHash: Promise<string> | null = null;
@@ -175,9 +176,9 @@ export const appRouter = router({
         return { success: true } as const;
       } catch (error) {
         if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
+          throw new TRPCError({ code: "BAD_REQUEST", message: CMS_PASSWORD_REQUIREMENT });
         }
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This verification code is invalid, expired, or has too many failed attempts." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't verify that code. Request a new code and use only the most recent email; codes expire after 10 minutes." });
       }
     }),
     forgotPassword: publicProcedure.input(z.object({ email: emailInput })).mutation(async ({ input }) => {
@@ -217,14 +218,25 @@ export const appRouter = router({
     resetPassword: publicProcedure.input(z.object({ email: emailInput, code: verificationCodeInput, password: passwordInput })).mutation(async ({ input, ctx }) => {
       try {
         if (!isStrongPassword(input.password)) throw new Error("PASSWORD_TOO_WEAK");
-        await completePasswordReset({ email: input.email, code: input.code, passwordHash: await hashPassword(input.password) });
+        const passwordHash = await hashPassword(input.password);
+        const credential = await getCredentialByEmail(input.email);
+        if (credential?.isPrimaryAdmin && !credential.deletedAt && (credential.status !== "active" || !credential.passwordHash)) {
+          await acceptInvitation({
+            email: input.email,
+            code: input.code,
+            name: credential.name?.trim() || "Primary Administrator",
+            passwordHash,
+          });
+        } else {
+          await completePasswordReset({ email: input.email, code: input.code, passwordHash });
+        }
         ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
         return { success: true } as const;
       } catch (error) {
         if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
+          throw new TRPCError({ code: "BAD_REQUEST", message: CMS_PASSWORD_REQUIREMENT });
         }
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This verification code is invalid, expired, or has too many failed attempts." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't verify that code. Request a new code and use only the most recent email; codes expire after 10 minutes." });
       }
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
