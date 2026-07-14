@@ -83,3 +83,18 @@
 - [x] Validate homepage, services navigation, Insights imagery, service FAQs, and admin workflows at desktop and mobile breakpoints.
 - [x] Run TypeScript checks, production build, route/image audits, and review runtime logs after the revisions.
 - [x] Save and deliver a new reviewable checkpoint with the admin login path and usage guidance.
+- [ ] Change the canonical CMS entry route from `/admin/articles` to `/admin`, preserving a redirect from the former route.
+- [ ] Replace Manus OAuth from the CMS access flow with Google-only sign-in and persistent secure sessions.
+- [ ] Establish `albert.aranbaev@gmail.com` as the immutable primary administrator.
+- [ ] Add an administrator membership and invitation data model with pending, accepted, revoked, and expired lifecycle states.
+- [ ] Add server-side administrator authorization that permits only the primary administrator and accepted invited administrators.
+- [ ] Add owner-only procedures to list users and invitations, invite administrators, resend invitations, revoke pending invitations, and remove active administrators.
+- [ ] Prevent removal or demotion of the primary administrator and invalidate removed administrators’ CMS access.
+- [ ] Configure Resend through a protected server-side environment variable and add production-safe invitation email delivery.
+- [ ] Add invitation acceptance that requires the invited Google email address and rejects mismatched, revoked, used, or expired invitations.
+- [ ] Add an administrator user-management interface under `/admin` with active users, pending invitations, add, resend, revoke, and remove actions.
+- [ ] Add explicit loading, empty, success, and error states for administrator management and invitation delivery.
+- [ ] Add Vitest coverage for Google identity validation, primary-admin protection, invitation lifecycle, user removal, route redirects, and Resend request construction.
+- [ ] Validate `/admin`, Google sign-in, invitation acceptance, invited-admin access, removal, email error handling, responsive UI, TypeScript, tests, build, and runtime logs.
+- [ ] Save and deliver a new reviewable checkpoint with Google and Resend setup guidance.
+- [x] Draft WordPress-ready Privacy Policy and Terms of Service pages for the Google-only administrator CMS and identify the homepage/app-name fixes required for Google OAuth branding verification.
