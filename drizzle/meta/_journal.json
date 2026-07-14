@@ -43,6 +43,13 @@
       "when": 1784038640831,
       "tag": "0005_nosy_mandarin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1784047117071,
+      "tag": "0006_dry_lady_mastermind",
+      "breakpoints": true
     }
   ]
 }

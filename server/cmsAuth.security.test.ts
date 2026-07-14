@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
+
 import {
   createCmsSessionToken,
   createOpaqueToken,
+  generateVerificationCode,
   hashOpaqueToken,
   hashPassword,
+  hashVerificationCode,
   isStrongPassword,
   normalizeEmail,
   verifyCmsSessionToken,
+  verifyCodeConstantTime,
   verifyPassword,
 } from "./cmsAuth";
 
@@ -39,6 +43,31 @@ describe("CMS authentication primitives", () => {
     expect(hashOpaqueToken(first)).toHaveLength(64);
     expect(hashOpaqueToken(first)).toBe(hashOpaqueToken(first));
     expect(hashOpaqueToken(first)).not.toBe(hashOpaqueToken(second));
+  });
+
+  it("generates exactly six numeric digits, including leading-zero-compatible output", () => {
+    for (let index = 0; index < 100; index += 1) {
+      expect(generateVerificationCode()).toMatch(/^\d{6}$/);
+    }
+  });
+
+  it("stores only a keyed code hash bound to purpose and normalized email", () => {
+    const code = "042817";
+    const invitationHash = hashVerificationCode(code, "invitation", " Editor@Example.COM ");
+    expect(invitationHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(invitationHash).not.toContain(code);
+    expect(invitationHash).toBe(hashVerificationCode(code, "invitation", "editor@example.com"));
+    expect(invitationHash).not.toBe(hashVerificationCode(code, "password_reset", "editor@example.com"));
+    expect(invitationHash).not.toBe(hashVerificationCode(code, "invitation", "other@example.com"));
+  });
+
+  it("verifies the correct code without accepting wrong, cross-purpose, or cross-account values", () => {
+    const storedHash = hashVerificationCode("718204", "password_reset", "editor@example.com");
+    expect(verifyCodeConstantTime({ code: "718204", storedHash, purpose: "password_reset", subject: "EDITOR@example.com" })).toBe(true);
+    expect(verifyCodeConstantTime({ code: "718205", storedHash, purpose: "password_reset", subject: "editor@example.com" })).toBe(false);
+    expect(verifyCodeConstantTime({ code: "718204", storedHash, purpose: "invitation", subject: "editor@example.com" })).toBe(false);
+    expect(verifyCodeConstantTime({ code: "718204", storedHash, purpose: "password_reset", subject: "other@example.com" })).toBe(false);
+    expect(verifyCodeConstantTime({ code: "718204", storedHash: "malformed", purpose: "password_reset", subject: "editor@example.com" })).toBe(false);
   });
 
   it("issues and verifies CMS session JWTs with the user session version", async () => {

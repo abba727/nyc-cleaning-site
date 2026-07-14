@@ -10,6 +10,7 @@ function selectChain(result: unknown[]) {
   chain.from = vi.fn(() => chain);
   chain.innerJoin = vi.fn(() => chain);
   chain.where = vi.fn(() => chain);
+  chain.orderBy = vi.fn(() => chain);
   chain.limit = vi.fn().mockResolvedValue(result);
   return chain;
 }
@@ -36,7 +37,8 @@ describe("primary administrator bootstrap", () => {
         .mockImplementationOnce(() => selectChain([]))
         .mockImplementationOnce(() => selectChain([{ id: 1 }]))
         .mockImplementationOnce(() => selectChain([credential]))
-        .mockImplementationOnce(() => selectChain([credential])),
+        .mockImplementationOnce(() => selectChain([credential]))
+        .mockImplementationOnce(() => selectChain([])),
       update: vi.fn(() => ({
         set: vi.fn((values: unknown) => {
           updateValues.push(values);
@@ -69,9 +71,10 @@ describe("primary administrator bootstrap", () => {
     expect(setup).toEqual(expect.objectContaining({
       email: "albert.aranbaev@gmail.com",
       role: "admin",
-      token: expect.any(String),
+      code: expect.stringMatching(/^\d{6}$/),
       expiresAt: expect.any(Date),
+      resendAvailableAt: expect.any(Date),
     }));
-    expect(setup?.token).toHaveLength(43);
+    expect(setup?.expiresAt.getTime() - Date.now()).toBeLessThanOrEqual(10 * 60 * 1000);
   });
 });

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import argon2 from "argon2";
 import { jwtVerify, SignJWT } from "jose";
 import { ENV } from "./_core/env";
@@ -6,8 +6,12 @@ import { ENV } from "./_core/env";
 export const CMS_SESSION_KIND = "nyc-cleaning-cms";
 export const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
 export const REMEMBER_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
-export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-export const RESET_TTL_MS = 60 * 60 * 1000;
+export const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
+export const INVITATION_TTL_MS = VERIFICATION_CODE_TTL_MS;
+export const RESET_TTL_MS = VERIFICATION_CODE_TTL_MS;
+export const CODE_RESEND_COOLDOWN_MS = 60 * 1000;
+export const MAX_CODE_ATTEMPTS = 5;
+export type VerificationCodePurpose = "invitation" | "password_reset";
 
 export type CmsSessionClaims = {
   userId: number;
@@ -29,6 +33,39 @@ export function createOpaqueToken() {
 
 export function hashOpaqueToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export function generateVerificationCode() {
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+function verificationCodeKey() {
+  if (!ENV.cookieSecret) throw new Error("JWT_SECRET is required");
+  return ENV.cookieSecret;
+}
+
+export function hashVerificationCode(
+  code: string,
+  purpose: VerificationCodePurpose,
+  subject: string,
+) {
+  return createHmac("sha256", verificationCodeKey())
+    .update(`${purpose}:${normalizeEmail(subject)}:${code}`)
+    .digest("hex");
+}
+
+export function verifyCodeConstantTime(input: {
+  code: string;
+  storedHash: string;
+  purpose: VerificationCodePurpose;
+  subject: string;
+}) {
+  const expected = Buffer.from(
+    hashVerificationCode(input.code, input.purpose, input.subject),
+    "hex",
+  );
+  const stored = Buffer.from(input.storedHash, "hex");
+  return expected.length === stored.length && timingSafeEqual(expected, stored);
 }
 
 export async function hashPassword(password: string) {

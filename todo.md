@@ -127,3 +127,12 @@
 - [x] Fix the production server-rendering `React is not defined` error by aligning the server bundle with the automatic JSX runtime, then verify live CMS pages render successfully.
 - [x] Deliver corrected first-access instructions using the actual managed production CMS URL because `www.nyccleaning.co` still serves the former WordPress site.
 - [x] Verify the published `/admin`, invitation setup, password reset, and protected user-management routes no longer fail during production server rendering.
+- [x] Replace emailed invitation activation links with single-use six-digit verification codes that expire after ten minutes.
+- [x] Replace emailed password-reset links with single-use six-digit verification codes while preserving non-enumerating recovery responses.
+- [x] Store only keyed hashes of verification codes, enforce attempt limits and resend cooldowns, and invalidate superseded codes.
+- [x] Update invitation, primary-administrator setup, and password-reset emails to display codes instead of clickable authentication links.
+- [x] Build accessible code-entry registration and password-reset interfaces that preserve Admin and Content Manager behavior.
+- [x] Add automated coverage for code generation, hashing, expiry, single use, failed-attempt limits, resend invalidation, and role authorization.
+- [x] Validate the code-based email flows, production build, responsive CMS routes, and provider acceptance before publishing.
+- [x] Publish the code-based authentication checkpoint and provide updated administrator instructions.
+- [x] Preserve the generic forgot-password response when primary-administrator setup is requested again during the resend cooldown.

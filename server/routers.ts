@@ -24,14 +24,12 @@ import {
   createPasswordReset,
   createPrimaryAdminSetup,
   getCredentialByEmail,
-  getInvitationByToken,
   listCmsUsersAndInvitations,
   recordLoginResult,
   removeCmsUser,
   revokeInvitation,
 } from "./cmsDb";
 import { sendInvitationEmail, sendPasswordResetEmail, sendPrimaryAdminSetupEmail } from "./cmsEmail";
-import { ENV } from "./_core/env";
 
 const inquiryInput = z.object({
   inquiryType: z.enum(["contact", "quote"]).default("quote"),
@@ -88,6 +86,7 @@ const articleInput = z.object({
 const cmsRole = z.enum(["admin", "content_manager"]);
 const emailInput = z.string().trim().toLowerCase().email().max(320);
 const passwordInput = z.string().min(12).max(128);
+const verificationCodeInput = z.string().regex(/^\d{6}$/, "Enter the six-digit code.");
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 let dummyPasswordHash: Promise<string> | null = null;
 
@@ -126,9 +125,10 @@ function accountError(error: unknown): never {
     PRIMARY_ADMIN_PROTECTED: "The primary administrator cannot be changed or removed.",
     USER_NOT_FOUND: "The selected user was not found.",
     INVITATION_NOT_FOUND: "The invitation is no longer available.",
+    CODE_RESEND_COOLDOWN: "Please wait one minute before requesting another code.",
   };
   throw new TRPCError({
-    code: message === "USER_NOT_FOUND" || message === "INVITATION_NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST",
+    code: message === "CODE_RESEND_COOLDOWN" ? "TOO_MANY_REQUESTS" : message === "USER_NOT_FOUND" || message === "INVITATION_NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST",
     message: known[message] || "The request could not be completed.",
   });
 }
@@ -161,19 +161,15 @@ export const appRouter = router({
       setCmsSessionCookie(ctx, token, input.rememberMe);
       return { success: true } as const;
     }),
-    invitation: publicProcedure.input(z.object({ token: z.string().min(32).max(256) })).query(async ({ input }) => {
-      const invitation = await getInvitationByToken(input.token);
-      if (!invitation) throw new TRPCError({ code: "NOT_FOUND", message: "This invitation is invalid or has expired." });
-      return { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt };
-    }),
     register: publicProcedure.input(z.object({
-      token: z.string().min(32).max(256),
+      email: emailInput,
+      code: verificationCodeInput,
       name: z.string().trim().min(2).max(200),
       password: passwordInput,
     })).mutation(async ({ input, ctx }) => {
       try {
         if (!isStrongPassword(input.password)) throw new Error("PASSWORD_TOO_WEAK");
-        const user = await acceptInvitation({ token: input.token, name: input.name, passwordHash: await hashPassword(input.password) });
+        const user = await acceptInvitation({ email: input.email, code: input.code, name: input.name, passwordHash: await hashPassword(input.password) });
         const token = await createCmsSessionToken({ userId: user.id, sessionVersion: user.sessionVersion }, false);
         setCmsSessionCookie(ctx, token, false);
         return { success: true } as const;
@@ -181,48 +177,54 @@ export const appRouter = router({
         if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
         }
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This invitation is invalid or has expired." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This verification code is invalid, expired, or has too many failed attempts." });
       }
     }),
     forgotPassword: publicProcedure.input(z.object({ email: emailInput })).mutation(async ({ input }) => {
-      const reset = await createPasswordReset(input.email);
-      if (reset) {
-        try {
-          const delivery = await sendPasswordResetEmail({
-            to: reset.email,
-            resetUrl: `${ENV.appBaseUrl}/admin/reset-password?token=${encodeURIComponent(reset.token)}`,
-          });
-          console.info("[CMS Auth] Password reset email accepted by provider", { messageId: delivery?.id ?? "unknown" });
-        } catch (error) {
-          console.error("[CMS Auth] Password reset email could not be sent", error);
-        }
-      } else {
-        const setup = await createPrimaryAdminSetup(input.email);
-        if (setup) {
+      try {
+        const reset = await createPasswordReset(input.email);
+        if (reset) {
           try {
-            const delivery = await sendPrimaryAdminSetupEmail({
-              to: setup.email,
-              setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(setup.token)}`,
+            const delivery = await sendPasswordResetEmail({
+              to: reset.email,
+              code: reset.code,
             });
-            console.info("[CMS Auth] Primary administrator setup email accepted by provider", { messageId: delivery?.id ?? "unknown" });
+            console.info("[CMS Auth] Password reset email accepted by provider", { messageId: delivery?.id ?? "unknown" });
           } catch (error) {
-            console.error("[CMS Auth] Primary administrator setup email could not be sent", error);
+            console.error("[CMS Auth] Password reset email could not be sent", error);
+          }
+        } else {
+          const setup = await createPrimaryAdminSetup(input.email);
+          if (setup) {
+            try {
+              const delivery = await sendPrimaryAdminSetupEmail({
+                to: setup.email,
+                code: setup.code,
+              });
+              console.info("[CMS Auth] Primary administrator setup email accepted by provider", { messageId: delivery?.id ?? "unknown" });
+            } catch (error) {
+              console.error("[CMS Auth] Primary administrator setup email could not be sent", error);
+            }
           }
         }
+      } catch (error) {
+        if (!(error instanceof Error && error.message === "CODE_RESEND_COOLDOWN")) {
+          console.error("[CMS Auth] Verification code request could not be completed", error);
+        }
       }
-      return { success: true, message: "If an active account matches that email, a password-reset link has been sent." } as const;
+      return { success: true, message: "If an eligible account matches that email, a six-digit verification code has been sent." } as const;
     }),
-    resetPassword: publicProcedure.input(z.object({ token: z.string().min(32).max(256), password: passwordInput })).mutation(async ({ input, ctx }) => {
+    resetPassword: publicProcedure.input(z.object({ email: emailInput, code: verificationCodeInput, password: passwordInput })).mutation(async ({ input, ctx }) => {
       try {
         if (!isStrongPassword(input.password)) throw new Error("PASSWORD_TOO_WEAK");
-        await completePasswordReset({ token: input.token, passwordHash: await hashPassword(input.password) });
+        await completePasswordReset({ email: input.email, code: input.code, passwordHash: await hashPassword(input.password) });
         ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
         return { success: true } as const;
       } catch (error) {
         if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
         }
-        throw new TRPCError({ code: "BAD_REQUEST", message: "This password-reset link is invalid or has expired." });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This verification code is invalid, expired, or has too many failed attempts." });
       }
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -241,7 +243,7 @@ export const appRouter = router({
         await sendInvitationEmail({
           to: invitation.email,
           role: invitation.role,
-          setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(invitation.token)}`,
+          code: invitation.code,
         });
         return { success: true } as const;
       } catch (error) {
@@ -257,7 +259,7 @@ export const appRouter = router({
         await sendInvitationEmail({
           to: invitation.email,
           role: invitation.role,
-          setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(invitation.token)}`,
+          code: invitation.code,
         });
         return { success: true } as const;
       } catch (error) {

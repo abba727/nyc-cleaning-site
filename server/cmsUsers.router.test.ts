@@ -9,7 +9,6 @@ const cmsDbMocks = vi.hoisted(() => ({
   createPasswordReset: vi.fn(),
   createPrimaryAdminSetup: vi.fn(),
   getCredentialByEmail: vi.fn(),
-  getInvitationByToken: vi.fn(),
   listCmsUsersAndInvitations: vi.fn(),
   recordLoginResult: vi.fn(),
   removeCmsUser: vi.fn(),
@@ -52,11 +51,11 @@ describe("CMS user-management procedures", () => {
     vi.clearAllMocks();
   });
 
-  it("creates a single-use invitation and emails the generated registration URL", async () => {
+  it("creates a single-use invitation and emails the generated six-digit code", async () => {
     cmsDbMocks.createInvitation.mockResolvedValue({
       email: "new.editor@example.com",
       role: "content_manager",
-      token: "a".repeat(64),
+      code: "042817",
     });
     emailMocks.sendInvitationEmail.mockResolvedValue(undefined);
 
@@ -73,8 +72,29 @@ describe("CMS user-management procedures", () => {
     });
     expect(emailMocks.sendInvitationEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: "new.editor@example.com",
-      setupUrl: expect.stringMatching(/\/admin\/register\?token=a{64}$/),
+      role: "content_manager",
+      code: "042817",
     }));
+  });
+
+  it("keeps invitation issuance and resend administrator-only", async () => {
+    const caller = appRouter.createCaller(context("content_manager"));
+    await expect(caller.cmsUsers.invite({ email: "new.editor@example.com", role: "content_manager" }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.cmsUsers.resendInvitation({ invitationId: 7 }))
+      .rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(cmsDbMocks.createInvitation).not.toHaveBeenCalled();
+  });
+
+  it("maps invitation resend cooldowns to a rate-limit response", async () => {
+    cmsDbMocks.listCmsUsersAndInvitations.mockResolvedValue({
+      users: [],
+      invitations: [{ id: 7, email: "new.editor@example.com", role: "content_manager" }],
+    });
+    cmsDbMocks.createInvitation.mockRejectedValue(new Error("CODE_RESEND_COOLDOWN"));
+    await expect(appRouter.createCaller(context("admin")).cmsUsers.resendInvitation({ invitationId: 7 }))
+      .rejects.toMatchObject({ code: "TOO_MANY_REQUESTS", message: "Please wait one minute before requesting another code." });
+    expect(emailMocks.sendInvitationEmail).not.toHaveBeenCalled();
   });
 
   it("rejects invitations for active accounts without sending email", async () => {
@@ -118,7 +138,7 @@ describe("CMS password recovery privacy", () => {
 
     expect(result).toEqual({
       success: true,
-      message: "If an active account matches that email, a password-reset link has been sent.",
+      message: "If an eligible account matches that email, a six-digit verification code has been sent.",
     });
     expect(cmsDbMocks.createPasswordReset).toHaveBeenCalledWith("unknown@example.com");
     expect(emailMocks.sendPasswordResetEmail).not.toHaveBeenCalled();
@@ -130,15 +150,30 @@ describe("CMS password recovery privacy", () => {
     cmsDbMocks.createPrimaryAdminSetup.mockResolvedValue({
       email: "albert.aranbaev@gmail.com",
       role: "admin",
-      token: "p".repeat(64),
+      code: "819204",
     });
 
     const result = await appRouter.createCaller(context(null)).auth.forgotPassword({ email: "albert.aranbaev@gmail.com" });
 
-    expect(result.message).toBe("If an active account matches that email, a password-reset link has been sent.");
+    expect(result.message).toBe("If an eligible account matches that email, a six-digit verification code has been sent.");
     expect(emailMocks.sendPrimaryAdminSetupEmail).toHaveBeenCalledWith({
       to: "albert.aranbaev@gmail.com",
-      setupUrl: expect.stringMatching(/\/admin\/register\?token=p{64}$/),
+      code: "819204",
     });
+  });
+
+  it("keeps the generic response when primary-administrator setup is requested during the resend cooldown", async () => {
+    cmsDbMocks.createPasswordReset.mockResolvedValue(null);
+    cmsDbMocks.createPrimaryAdminSetup.mockRejectedValue(new Error("CODE_RESEND_COOLDOWN"));
+
+    const result = await appRouter.createCaller(context(null)).auth.forgotPassword({
+      email: "albert.aranbaev@gmail.com",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      message: "If an eligible account matches that email, a six-digit verification code has been sent.",
+    });
+    expect(emailMocks.sendPrimaryAdminSetupEmail).not.toHaveBeenCalled();
   });
 });

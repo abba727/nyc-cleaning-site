@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gt, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, ne, sql } from "drizzle-orm";
 import {
   authAuditEvents,
   cmsCredentials,
@@ -9,11 +9,14 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import {
-  createOpaqueToken,
-  hashOpaqueToken,
+  CODE_RESEND_COOLDOWN_MS,
+  generateVerificationCode,
+  hashVerificationCode,
   INVITATION_TTL_MS,
+  MAX_CODE_ATTEMPTS,
   normalizeEmail,
   RESET_TTL_MS,
+  verifyCodeConstantTime,
 } from "./cmsAuth";
 import { ENV } from "./_core/env";
 
@@ -21,6 +24,13 @@ export type CmsRole = "admin" | "content_manager";
 
 function localOpenId(email: string) {
   return `cms:${createHash("sha256").update(normalizeEmail(email)).digest("hex").slice(0, 58)}`;
+}
+
+function getAffectedRows(result: unknown) {
+  const header = Array.isArray(result) ? result[0] : result;
+  if (!header || typeof header !== "object" || !("affectedRows" in header)) return 0;
+  const affectedRows = Number((header as { affectedRows: unknown }).affectedRows);
+  return Number.isFinite(affectedRows) ? affectedRows : 0;
 }
 
 export async function getCmsUserById(userId: number) {
@@ -93,10 +103,22 @@ export async function createInvitation(input: { email: string; role: CmsRole; ac
   const existing = await getCredentialByEmail(email);
   if (existing && !existing.deletedAt && existing.status === "active") throw new Error("USER_ALREADY_ACTIVE");
 
-  const token = createOpaqueToken();
-  const tokenHash = hashOpaqueToken(token);
   const now = new Date();
+  const pendingRows = await db
+    .select()
+    .from(cmsInvitations)
+    .where(and(eq(cmsInvitations.email, email), eq(cmsInvitations.status, "pending")))
+    .orderBy(desc(cmsInvitations.createdAt))
+    .limit(1);
+  const previous = pendingRows[0];
+  if (previous?.resendAvailableAt && previous.resendAvailableAt > now) {
+    throw new Error("CODE_RESEND_COOLDOWN");
+  }
+
+  const code = generateVerificationCode();
+  const codeHash = hashVerificationCode(code, "invitation", email);
   const expiresAt = new Date(now.getTime() + INVITATION_TTL_MS);
+  const resendAvailableAt = new Date(now.getTime() + CODE_RESEND_COOLDOWN_MS);
   await db.transaction(async tx => {
     await tx
       .update(cmsInvitations)
@@ -105,10 +127,13 @@ export async function createInvitation(input: { email: string; role: CmsRole; ac
     await tx.insert(cmsInvitations).values({
       email,
       role: input.role,
-      tokenHash,
+      codeHash,
       invitedByUserId: input.actorUserId,
       expiresAt,
       lastSentAt: now,
+      sendCount: (previous?.sendCount ?? 0) + 1,
+      attemptCount: 0,
+      resendAvailableAt,
     });
     await tx.insert(authAuditEvents).values({
       actorUserId: input.actorUserId,
@@ -118,19 +143,21 @@ export async function createInvitation(input: { email: string; role: CmsRole; ac
       newRole: input.role,
     });
   });
-  return { token, email, role: input.role, expiresAt };
+  return { code, email, role: input.role, expiresAt, resendAvailableAt };
 }
 
-export async function getInvitationByToken(token: string) {
+async function getPendingInvitationByEmail(emailInput: string) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const email = normalizeEmail(emailInput);
   const rows = await db
     .select()
     .from(cmsInvitations)
-    .where(eq(cmsInvitations.tokenHash, hashOpaqueToken(token)))
+    .where(and(eq(cmsInvitations.email, email), eq(cmsInvitations.status, "pending")))
+    .orderBy(desc(cmsInvitations.createdAt))
     .limit(1);
   const invitation = rows[0];
-  if (!invitation || invitation.status !== "pending") return null;
+  if (!invitation) return null;
   if (invitation.expiresAt <= new Date()) {
     await db.update(cmsInvitations).set({ status: "expired" }).where(eq(cmsInvitations.id, invitation.id));
     return null;
@@ -138,22 +165,33 @@ export async function getInvitationByToken(token: string) {
   return invitation;
 }
 
-export async function acceptInvitation(input: { token: string; name: string; passwordHash: string }) {
+export async function acceptInvitation(input: { email: string; code: string; name: string; passwordHash: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
-  const tokenHash = hashOpaqueToken(input.token);
-  const invitation = await getInvitationByToken(input.token);
+  const email = normalizeEmail(input.email);
+  const invitation = await getPendingInvitationByEmail(email);
   if (!invitation) throw new Error("INVALID_INVITATION");
+  if (invitation.attemptCount >= MAX_CODE_ATTEMPTS) throw new Error("CODE_ATTEMPTS_EXCEEDED");
+  if (!verifyCodeConstantTime({
+    code: input.code,
+    storedHash: invitation.codeHash,
+    purpose: "invitation",
+    subject: email,
+  })) {
+    await db.update(cmsInvitations)
+      .set({ attemptCount: sql`${cmsInvitations.attemptCount} + 1` })
+      .where(and(eq(cmsInvitations.id, invitation.id), eq(cmsInvitations.status, "pending"), lt(cmsInvitations.attemptCount, MAX_CODE_ATTEMPTS)));
+    throw new Error("INVALID_INVITATION");
+  }
   const now = new Date();
   let acceptedUserId = 0;
 
   await db.transaction(async tx => {
-    const currentRows = await tx
-      .select()
-      .from(cmsInvitations)
-      .where(and(eq(cmsInvitations.id, invitation.id), eq(cmsInvitations.tokenHash, tokenHash), eq(cmsInvitations.status, "pending"), gt(cmsInvitations.expiresAt, now)))
-      .limit(1);
-    if (!currentRows[0]) throw new Error("INVALID_INVITATION");
+    const consumeResult = await tx
+      .update(cmsInvitations)
+      .set({ status: "accepted", acceptedAt: now })
+      .where(and(eq(cmsInvitations.id, invitation.id), eq(cmsInvitations.status, "pending"), gt(cmsInvitations.expiresAt, now), lt(cmsInvitations.attemptCount, MAX_CODE_ATTEMPTS)));
+    if (getAffectedRows(consumeResult) !== 1) throw new Error("INVALID_INVITATION");
 
     const credentialRows = await tx
       .select({ userId: cmsCredentials.userId })
@@ -195,11 +233,8 @@ export async function acceptInvitation(input: { token: string; name: string; pas
         sessionVersion: 1,
       }).where(eq(cmsCredentials.userId, acceptedUserId));
     }
-    await tx.update(cmsInvitations).set({
-      status: "accepted",
-      acceptedByUserId: acceptedUserId,
-      acceptedAt: now,
-    }).where(and(eq(cmsInvitations.id, invitation.id), eq(cmsInvitations.status, "pending")));
+    await tx.update(cmsInvitations).set({ acceptedByUserId: acceptedUserId })
+      .where(and(eq(cmsInvitations.id, invitation.id), eq(cmsInvitations.status, "accepted"), eq(cmsInvitations.acceptedAt, now)));
     await tx.update(cmsInvitations).set({ status: "revoked", revokedAt: now })
       .where(and(eq(cmsInvitations.email, invitation.email), eq(cmsInvitations.status, "pending"), ne(cmsInvitations.id, invitation.id)));
     await tx.insert(authAuditEvents).values({
@@ -221,13 +256,29 @@ export async function createPasswordReset(emailInput: string) {
   const email = normalizeEmail(emailInput);
   const credential = await getCredentialByEmail(email);
   if (!credential || credential.deletedAt || credential.status !== "active" || !credential.passwordHash) return null;
-  const token = createOpaqueToken();
   const now = new Date();
+  const activeRows = await db.select().from(passwordResetTokens)
+    .where(and(eq(passwordResetTokens.userId, credential.userId), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt)))
+    .orderBy(desc(passwordResetTokens.createdAt))
+    .limit(1);
+  const previous = activeRows[0];
+  if (previous?.resendAvailableAt && previous.resendAvailableAt > now) return null;
+
+  const code = generateVerificationCode();
   const expiresAt = new Date(now.getTime() + RESET_TTL_MS);
+  const resendAvailableAt = new Date(now.getTime() + CODE_RESEND_COOLDOWN_MS);
   await db.transaction(async tx => {
     await tx.update(passwordResetTokens).set({ revokedAt: now })
       .where(and(eq(passwordResetTokens.userId, credential.userId), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt)));
-    await tx.insert(passwordResetTokens).values({ userId: credential.userId, tokenHash: hashOpaqueToken(token), expiresAt });
+    await tx.insert(passwordResetTokens).values({
+      userId: credential.userId,
+      codeHash: hashVerificationCode(code, "password_reset", email),
+      expiresAt,
+      attemptCount: 0,
+      resendAvailableAt,
+      lastSentAt: now,
+      sendCount: (previous?.sendCount ?? 0) + 1,
+    });
     await tx.insert(authAuditEvents).values({
       actorUserId: credential.userId,
       targetUserId: credential.userId,
@@ -235,7 +286,7 @@ export async function createPasswordReset(emailInput: string) {
       action: "password_reset_requested",
     });
   });
-  return { token, email, expiresAt };
+  return { code, email, expiresAt, resendAvailableAt };
 }
 
 export async function createPrimaryAdminSetup(emailInput: string) {
@@ -247,17 +298,40 @@ export async function createPrimaryAdminSetup(emailInput: string) {
   return createInvitation({ email, role: "admin", actorUserId: credential.userId });
 }
 
-export async function completePasswordReset(input: { token: string; passwordHash: string }) {
+export async function completePasswordReset(input: { email: string; code: string; passwordHash: string }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const email = normalizeEmail(input.email);
+  const credential = await getCredentialByEmail(email);
+  if (!credential || credential.deletedAt || credential.status !== "active" || !credential.passwordHash) {
+    throw new Error("INVALID_RESET");
+  }
   const now = new Date();
   const rows = await db.select().from(passwordResetTokens)
-    .where(and(eq(passwordResetTokens.tokenHash, hashOpaqueToken(input.token)), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt), gt(passwordResetTokens.expiresAt, now)))
+    .where(and(eq(passwordResetTokens.userId, credential.userId), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt)))
+    .orderBy(desc(passwordResetTokens.createdAt))
     .limit(1);
   const reset = rows[0];
-  if (!reset) throw new Error("INVALID_RESET");
+  if (!reset || reset.expiresAt <= now) {
+    if (reset) await db.update(passwordResetTokens).set({ revokedAt: now }).where(eq(passwordResetTokens.id, reset.id));
+    throw new Error("INVALID_RESET");
+  }
+  if (reset.attemptCount >= MAX_CODE_ATTEMPTS) throw new Error("CODE_ATTEMPTS_EXCEEDED");
+  if (!verifyCodeConstantTime({
+    code: input.code,
+    storedHash: reset.codeHash,
+    purpose: "password_reset",
+    subject: email,
+  })) {
+    await db.update(passwordResetTokens)
+      .set({ attemptCount: sql`${passwordResetTokens.attemptCount} + 1` })
+      .where(and(eq(passwordResetTokens.id, reset.id), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt), lt(passwordResetTokens.attemptCount, MAX_CODE_ATTEMPTS)));
+    throw new Error("INVALID_RESET");
+  }
   await db.transaction(async tx => {
-    await tx.update(passwordResetTokens).set({ usedAt: now }).where(and(eq(passwordResetTokens.id, reset.id), isNull(passwordResetTokens.usedAt)));
+    const consumeResult = await tx.update(passwordResetTokens).set({ usedAt: now })
+      .where(and(eq(passwordResetTokens.id, reset.id), isNull(passwordResetTokens.usedAt), isNull(passwordResetTokens.revokedAt), gt(passwordResetTokens.expiresAt, now), lt(passwordResetTokens.attemptCount, MAX_CODE_ATTEMPTS)));
+    if (getAffectedRows(consumeResult) !== 1) throw new Error("INVALID_RESET");
     await tx.update(cmsCredentials).set({
       passwordHash: input.passwordHash,
       passwordChangedAt: now,
@@ -287,7 +361,7 @@ export async function listCmsUsersAndInvitations() {
   ]);
   return {
     users: userRows.filter(row => row.role === "admin" || row.role === "content_manager"),
-    invitations: invitationRows.map(({ tokenHash: _tokenHash, ...invitation }) => invitation),
+    invitations: invitationRows.map(({ codeHash: _codeHash, ...invitation }) => invitation),
   };
 }
 
