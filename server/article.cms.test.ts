@@ -29,7 +29,7 @@ const user = (overrides: Partial<User> = {}): User => ({
   openId: "ordinary-user",
   email: "editor@example.com",
   name: "Article Editor",
-  loginMethod: "manus",
+  loginMethod: "password",
   role: "user",
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
   updatedAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -77,17 +77,17 @@ describe("article CMS authorization and contracts", () => {
     expect(dbMocks.listAllArticles).not.toHaveBeenCalled();
   });
 
-  it("recognizes the configured project owner and permits owner-only management", async () => {
+  it("permits an authenticated CMS administrator to manage articles", async () => {
     dbMocks.listAllArticles.mockResolvedValue([]);
-    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId })));
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "admin" })));
 
     await expect(caller.auth.me()).resolves.toMatchObject({ role: "admin" });
     await expect(caller.article.adminList()).resolves.toEqual([]);
   });
 
-  it("synchronizes explicit editorial fields with preserved public fields on create", async () => {
+  it("permits a content manager to create articles", async () => {
     dbMocks.createArticle.mockResolvedValue(501);
-    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId })));
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
 
     await expect(caller.article.create(validArticle)).resolves.toEqual({ success: true, id: 501 });
     expect(dbMocks.createArticle).toHaveBeenCalledWith(expect.objectContaining({
@@ -101,12 +101,12 @@ describe("article CMS authorization and contracts", () => {
     }));
   });
 
-  it("uploads owner cover images to deployment-safe object storage", async () => {
+  it("uploads CMS cover images to deployment-safe object storage", async () => {
     storageMocks.storagePut.mockResolvedValue({
       key: "article-covers/owner/lobby-cover.png",
       url: "/manus-storage/lobby-cover.png",
     });
-    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId })));
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
 
     const result = await caller.article.uploadCover({
       fileName: "Lobby Cover.png",

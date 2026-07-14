@@ -2,7 +2,6 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
-import { ENV } from "./env";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -28,11 +27,11 @@ const requireUser = t.middleware(async opts => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const contentProcedure = t.procedure.use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
-    if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.openId !== ENV.ownerOpenId)) {
+    if (!ctx.user || (ctx.user.role !== "admin" && ctx.user.role !== "content_manager")) {
       throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
 
@@ -44,3 +43,16 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+export const accountAdminProcedure = t.procedure.use(
+  t.middleware(async opts => {
+    const { ctx, next } = opts;
+    if (!ctx.user || ctx.user.role !== "admin") {
+      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  }),
+);
+
+// Existing article routes use this name; content managers are intentionally authorized.
+export const adminProcedure = contentProcedure;

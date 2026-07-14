@@ -7,4 +7,8 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  primaryAdminEmail: (process.env.PRIMARY_ADMIN_EMAIL ?? "albert.aranbaev@gmail.com").trim().toLowerCase(),
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFromEmail: process.env.RESEND_FROM_EMAIL?.trim() ?? "",
+  appBaseUrl: (process.env.APP_BASE_URL ?? "https://www.nyccleaning.co").replace(/\/$/, ""),
 };

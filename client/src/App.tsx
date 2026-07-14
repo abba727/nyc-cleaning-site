@@ -1,19 +1,37 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Redirect, Route, Switch } from "wouter";
+import { useAuth } from "./_core/hooks/useAuth";
 import DashboardLayout from "./components/DashboardLayout";
+import { DashboardLayoutSkeleton } from "./components/DashboardLayoutSkeleton";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import ArticleAdmin from "./pages/ArticleAdmin";
+import AdminForgotPassword from "./pages/AdminForgotPassword";
+import AdminLogin from "./pages/AdminLogin";
+import AdminRegister from "./pages/AdminRegister";
+import AdminResetPassword from "./pages/AdminResetPassword";
+import AdminUsers from "./pages/AdminUsers";
+
+function AdminEntry() {
+  const { loading, user } = useAuth();
+  if (loading) return <DashboardLayoutSkeleton />;
+  if (!user) return <AdminLogin />;
+  return <DashboardLayout><ArticleAdmin /></DashboardLayout>;
+}
 
 function Router() {
   return (
     <Switch>
-      <Route path="/admin"><DashboardLayout><ArticleAdmin /></DashboardLayout></Route>
-      <Route path="/admin/articles"><DashboardLayout><ArticleAdmin /></DashboardLayout></Route>
+      <Route path="/admin/register"><AdminRegister /></Route>
+      <Route path="/admin/forgot-password"><AdminForgotPassword /></Route>
+      <Route path="/admin/reset-password"><AdminResetPassword /></Route>
+      <Route path="/admin/users"><DashboardLayout><AdminUsers /></DashboardLayout></Route>
+      <Route path="/admin/articles"><Redirect to="/admin" /></Route>
+      <Route path="/admin"><AdminEntry /></Route>
       <Route>
         <div className="site-shell">
           <SiteHeader />

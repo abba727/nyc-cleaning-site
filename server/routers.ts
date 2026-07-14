@@ -5,8 +5,32 @@ import { countRecentInquiriesByEmail, createArticle, createInquiry, deleteArticl
 import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
-import { adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
+import {
+  createCmsSessionToken,
+  hashPassword,
+  isStrongPassword,
+  normalizeEmail,
+  REMEMBER_SESSION_MS,
+  SHORT_SESSION_MS,
+  verifyPassword,
+} from "./cmsAuth";
+import {
+  acceptInvitation,
+  changeCmsUserRole,
+  completePasswordReset,
+  createInvitation,
+  createPasswordReset,
+  createPrimaryAdminSetup,
+  getCredentialByEmail,
+  getInvitationByToken,
+  listCmsUsersAndInvitations,
+  recordLoginResult,
+  removeCmsUser,
+  revokeInvitation,
+} from "./cmsDb";
+import { sendInvitationEmail, sendPasswordResetEmail, sendPrimaryAdminSetupEmail } from "./cmsEmail";
 import { ENV } from "./_core/env";
 
 const inquiryInput = z.object({
@@ -61,13 +85,143 @@ const articleInput = z.object({
   publishedAt: z.coerce.date().nullable().optional(),
 });
 
+const cmsRole = z.enum(["admin", "content_manager"]);
+const emailInput = z.string().trim().toLowerCase().email().max(320);
+const passwordInput = z.string().min(12).max(128);
+const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+let dummyPasswordHash: Promise<string> | null = null;
+
+function loginAttemptKey(email: string, ip?: string) {
+  return `${normalizeEmail(email)}:${ip || "unknown"}`;
+}
+
+function enforceLoginThrottle(key: string) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  if (entry && entry.resetAt > now && entry.count >= 7) {
+    throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Too many attempts. Please wait 15 minutes and try again." });
+  }
+  if (entry && entry.resetAt <= now) loginAttempts.delete(key);
+}
+
+function recordLoginFailure(key: string) {
+  const now = Date.now();
+  const entry = loginAttempts.get(key);
+  loginAttempts.set(key, entry && entry.resetAt > now
+    ? { ...entry, count: entry.count + 1 }
+    : { count: 1, resetAt: now + 15 * 60 * 1000 });
+}
+
+function setCmsSessionCookie(ctx: { req: any; res: any }, token: string, rememberMe: boolean) {
+  ctx.res.cookie(COOKIE_NAME, token, {
+    ...getSessionCookieOptions(ctx.req),
+    maxAge: rememberMe ? REMEMBER_SESSION_MS : SHORT_SESSION_MS,
+  });
+}
+
+function accountError(error: unknown): never {
+  const message = error instanceof Error ? error.message : "UNKNOWN";
+  const known: Record<string, string> = {
+    USER_ALREADY_ACTIVE: "An active user already exists with that email address.",
+    PRIMARY_ADMIN_PROTECTED: "The primary administrator cannot be changed or removed.",
+    USER_NOT_FOUND: "The selected user was not found.",
+    INVITATION_NOT_FOUND: "The invitation is no longer available.",
+  };
+  throw new TRPCError({
+    code: message === "USER_NOT_FOUND" || message === "INVITATION_NOT_FOUND" ? "NOT_FOUND" : "BAD_REQUEST",
+    message: known[message] || "The request could not be completed.",
+  });
+}
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => {
-      if (!opts.ctx.user || opts.ctx.user.openId !== ENV.ownerOpenId) return opts.ctx.user;
-      return { ...opts.ctx.user, role: "admin" as const };
+    me: publicProcedure.query(opts => opts.ctx.user),
+    login: publicProcedure.input(z.object({
+      email: emailInput,
+      password: z.string().min(1).max(128),
+      rememberMe: z.boolean().default(false),
+    })).mutation(async ({ input, ctx }) => {
+      const email = normalizeEmail(input.email);
+      const key = loginAttemptKey(email, ctx.req.ip);
+      enforceLoginThrottle(key);
+      const credential = await getCredentialByEmail(email);
+      const fallback = dummyPasswordHash ??= hashPassword("Not a real account password 9284!");
+      const passwordValid = await verifyPassword(credential?.passwordHash || await fallback, input.password);
+      const allowed = Boolean(credential && !credential.deletedAt && credential.status === "active" && credential.passwordHash && passwordValid && (credential.role === "admin" || credential.role === "content_manager"));
+      if (!allowed || !credential) {
+        recordLoginFailure(key);
+        await recordLoginResult({ email, success: false });
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      }
+      loginAttempts.delete(key);
+      await recordLoginResult({ userId: credential.userId, email, success: true });
+      const token = await createCmsSessionToken({ userId: credential.userId, sessionVersion: credential.sessionVersion }, input.rememberMe);
+      setCmsSessionCookie(ctx, token, input.rememberMe);
+      return { success: true } as const;
+    }),
+    invitation: publicProcedure.input(z.object({ token: z.string().min(32).max(256) })).query(async ({ input }) => {
+      const invitation = await getInvitationByToken(input.token);
+      if (!invitation) throw new TRPCError({ code: "NOT_FOUND", message: "This invitation is invalid or has expired." });
+      return { email: invitation.email, role: invitation.role, expiresAt: invitation.expiresAt };
+    }),
+    register: publicProcedure.input(z.object({
+      token: z.string().min(32).max(256),
+      name: z.string().trim().min(2).max(200),
+      password: passwordInput,
+    })).mutation(async ({ input, ctx }) => {
+      try {
+        if (!isStrongPassword(input.password)) throw new Error("PASSWORD_TOO_WEAK");
+        const user = await acceptInvitation({ token: input.token, name: input.name, passwordHash: await hashPassword(input.password) });
+        const token = await createCmsSessionToken({ userId: user.id, sessionVersion: user.sessionVersion }, false);
+        setCmsSessionCookie(ctx, token, false);
+        return { success: true } as const;
+      } catch (error) {
+        if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
+        }
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This invitation is invalid or has expired." });
+      }
+    }),
+    forgotPassword: publicProcedure.input(z.object({ email: emailInput })).mutation(async ({ input }) => {
+      const reset = await createPasswordReset(input.email);
+      if (reset) {
+        try {
+          await sendPasswordResetEmail({
+            to: reset.email,
+            resetUrl: `${ENV.appBaseUrl}/admin/reset-password?token=${encodeURIComponent(reset.token)}`,
+          });
+        } catch (error) {
+          console.error("[CMS Auth] Password reset email could not be sent", error);
+        }
+      } else {
+        const setup = await createPrimaryAdminSetup(input.email);
+        if (setup) {
+          try {
+            await sendPrimaryAdminSetupEmail({
+              to: setup.email,
+              setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(setup.token)}`,
+            });
+          } catch (error) {
+            console.error("[CMS Auth] Primary administrator setup email could not be sent", error);
+          }
+        }
+      }
+      return { success: true, message: "If an active account matches that email, a password-reset link has been sent." } as const;
+    }),
+    resetPassword: publicProcedure.input(z.object({ token: z.string().min(32).max(256), password: passwordInput })).mutation(async ({ input, ctx }) => {
+      try {
+        if (!isStrongPassword(input.password)) throw new Error("PASSWORD_TOO_WEAK");
+        await completePasswordReset({ token: input.token, passwordHash: await hashPassword(input.password) });
+        ctx.res.clearCookie(COOKIE_NAME, { ...getSessionCookieOptions(ctx.req), maxAge: -1 });
+        return { success: true } as const;
+      } catch (error) {
+        if (error instanceof Error && error.message === "PASSWORD_TOO_WEAK") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Use at least 12 characters with uppercase, lowercase, a number, and a symbol." });
+        }
+        throw new TRPCError({ code: "BAD_REQUEST", message: "This password-reset link is invalid or has expired." });
+      }
     }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -75,6 +229,63 @@ export const appRouter = router({
       return {
         success: true,
       } as const;
+    }),
+  }),
+  cmsUsers: router({
+    list: accountAdminProcedure.query(() => listCmsUsersAndInvitations()),
+    invite: accountAdminProcedure.input(z.object({ email: emailInput, role: cmsRole })).mutation(async ({ input, ctx }) => {
+      try {
+        const invitation = await createInvitation({ email: input.email, role: input.role, actorUserId: ctx.user.id });
+        await sendInvitationEmail({
+          to: invitation.email,
+          role: invitation.role,
+          setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(invitation.token)}`,
+        });
+        return { success: true } as const;
+      } catch (error) {
+        accountError(error);
+      }
+    }),
+    resendInvitation: accountAdminProcedure.input(z.object({ invitationId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+      const data = await listCmsUsersAndInvitations();
+      const previous = data.invitations.find(item => item.id === input.invitationId);
+      if (!previous) throw new TRPCError({ code: "NOT_FOUND", message: "The invitation is no longer available." });
+      try {
+        const invitation = await createInvitation({ email: previous.email, role: previous.role as "admin" | "content_manager", actorUserId: ctx.user.id });
+        await sendInvitationEmail({
+          to: invitation.email,
+          role: invitation.role,
+          setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(invitation.token)}`,
+        });
+        return { success: true } as const;
+      } catch (error) {
+        accountError(error);
+      }
+    }),
+    revokeInvitation: accountAdminProcedure.input(z.object({ invitationId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+      try {
+        await revokeInvitation({ invitationId: input.invitationId, actorUserId: ctx.user.id });
+        return { success: true } as const;
+      } catch (error) {
+        accountError(error);
+      }
+    }),
+    changeRole: accountAdminProcedure.input(z.object({ userId: z.number().int().positive(), role: cmsRole })).mutation(async ({ input, ctx }) => {
+      try {
+        await changeCmsUserRole({ targetUserId: input.userId, role: input.role, actorUserId: ctx.user.id });
+        return { success: true } as const;
+      } catch (error) {
+        accountError(error);
+      }
+    }),
+    remove: accountAdminProcedure.input(z.object({ userId: z.number().int().positive() })).mutation(async ({ input, ctx }) => {
+      if (input.userId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST", message: "You cannot remove your own account." });
+      try {
+        await removeCmsUser({ targetUserId: input.userId, actorUserId: ctx.user.id });
+        return { success: true } as const;
+      } catch (error) {
+        accountError(error);
+      }
     }),
   }),
   inquiry: router({

@@ -36,6 +36,13 @@
       "when": 1783981012973,
       "tag": "0004_wooden_inhumans",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1784038640831,
+      "tag": "0005_nosy_mandarin",
+      "breakpoints": true
     }
   ]
 }

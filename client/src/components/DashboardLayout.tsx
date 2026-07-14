@@ -19,18 +19,18 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import { getDashboardAccessState } from "@/lib/adminAccess";
-import { ArrowUpRight, FileText, LogOut, PanelLeft } from "lucide-react";
+import { ArrowUpRight, FileText, LogOut, PanelLeft, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
 const menuItems = [
-  { icon: FileText, label: "Insights editor", path: "/admin/articles" },
-  { icon: ArrowUpRight, label: "View public site", path: "/" },
+  { icon: FileText, label: "Insights editor", path: "/admin", adminOnly: false },
+  { icon: Users, label: "Users", path: "/admin/users", adminOnly: true },
+  { icon: ArrowUpRight, label: "View public site", path: "/", adminOnly: false },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -49,7 +49,12 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const accessState = getDashboardAccessState(loading, user);
+
+  useEffect(() => {
+    if (accessState === "signed-out") setLocation("/admin");
+  }, [accessState, setLocation]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -61,36 +66,16 @@ export default function DashboardLayout({
   }
 
   if (accessState === "signed-out") {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
-          <div className="flex flex-col items-center gap-6">
-            <h1 className="text-2xl font-semibold tracking-tight text-center">
-              Sign in to continue
-            </h1>
-            <p className="text-sm text-muted-foreground text-center max-w-sm">
-              Sign in with the project owner account to manage NYC Cleaning articles. Other accounts cannot open the editor.
-            </p>
-          </div>
-          <Button
-            onClick={() => startLogin()}
-            size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
-          >
-            Sign in
-          </Button>
-        </div>
-      </div>
-    );
+    return <DashboardLayoutSkeleton />;
   }
 
   if (accessState === "denied") {
     return (
       <div className="admin-access-state">
-        <p className="admin-eyebrow">Owner access</p>
-        <h1>This account does not have administrator access.</h1>
-        <p>Sign in with the project owner account, or promote this account to the admin role from the project database.</p>
-        <Button onClick={logout}>Sign out and use another account</Button>
+        <p className="admin-eyebrow">CMS access</p>
+        <h1>This account does not have CMS access.</h1>
+        <p>Ask an administrator to invite you as an Admin or Content Manager.</p>
+        <Button onClick={() => void logout()}>Sign out and use another account</Button>
         <a href="/">Return to the public site</a>
       </div>
     );
@@ -196,7 +181,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
+              {menuItems.filter(item => !item.adminOnly || user?.role === "admin").map(item => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
@@ -233,12 +218,15 @@ function DashboardLayoutContent({
                     <p className="text-xs text-muted-foreground truncate mt-1.5">
                       {user?.email || "-"}
                     </p>
+                    <p className="text-[11px] text-muted-foreground truncate mt-1">
+                      {user?.role === "admin" ? "Admin" : "Content Manager"}
+                    </p>
                   </div>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
-                  onClick={logout}
+                  onClick={() => void logout()}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />

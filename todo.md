@@ -83,18 +83,39 @@
 - [x] Validate homepage, services navigation, Insights imagery, service FAQs, and admin workflows at desktop and mobile breakpoints.
 - [x] Run TypeScript checks, production build, route/image audits, and review runtime logs after the revisions.
 - [x] Save and deliver a new reviewable checkpoint with the admin login path and usage guidance.
-- [ ] Change the canonical CMS entry route from `/admin/articles` to `/admin`, preserving a redirect from the former route.
-- [ ] Replace Manus OAuth from the CMS access flow with Google-only sign-in and persistent secure sessions.
-- [ ] Establish `albert.aranbaev@gmail.com` as the immutable primary administrator.
-- [ ] Add an administrator membership and invitation data model with pending, accepted, revoked, and expired lifecycle states.
-- [ ] Add server-side administrator authorization that permits only the primary administrator and accepted invited administrators.
-- [ ] Add owner-only procedures to list users and invitations, invite administrators, resend invitations, revoke pending invitations, and remove active administrators.
-- [ ] Prevent removal or demotion of the primary administrator and invalidate removed administrators’ CMS access.
-- [ ] Configure Resend through a protected server-side environment variable and add production-safe invitation email delivery.
-- [ ] Add invitation acceptance that requires the invited Google email address and rejects mismatched, revoked, used, or expired invitations.
-- [ ] Add an administrator user-management interface under `/admin` with active users, pending invitations, add, resend, revoke, and remove actions.
-- [ ] Add explicit loading, empty, success, and error states for administrator management and invitation delivery.
-- [ ] Add Vitest coverage for Google identity validation, primary-admin protection, invitation lifecycle, user removal, route redirects, and Resend request construction.
-- [ ] Validate `/admin`, Google sign-in, invitation acceptance, invited-admin access, removal, email error handling, responsive UI, TypeScript, tests, build, and runtime logs.
-- [ ] Save and deliver a new reviewable checkpoint with Google and Resend setup guidance.
+- [x] Superseded: Change the canonical CMS entry route from `/admin/articles` to `/admin`, preserving a redirect from the former route.
+- [x] Superseded by the email-and-password decision: replace Manus OAuth with Google-only CMS sign-in.
+- [x] Superseded: Establish `albert.aranbaev@gmail.com` as the immutable primary administrator through Google identity.
+- [x] Superseded: Add the Google-specific administrator membership and invitation lifecycle.
+- [x] Superseded: Add Google-email membership authorization.
+- [x] Superseded: Add owner-only Google administrator procedures.
+- [x] Superseded: Protect the primary administrator and invalidate removed Google administrators.
+- [x] Superseded: Configure Resend for Google-account invitation delivery.
+- [x] Superseded: Require invited Google identities during invitation acceptance.
+- [x] Superseded: Add the Google-specific administrator management interface.
+- [x] Superseded: Add Google invitation loading, success, empty, and error states.
+- [x] Superseded: Add Google identity and invitation test coverage.
+- [x] Superseded: Validate the Google OAuth CMS flow.
+- [x] Superseded: Deliver the Google OAuth CMS checkpoint.
 - [x] Draft WordPress-ready Privacy Policy and Terms of Service pages for the Google-only administrator CMS and identify the homepage/app-name fixes required for Google OAuth branding verification.
+- [x] Diagnose Google’s continued rejection of the WordPress homepage app-purpose disclosure and provide a crawler-visible replacement section with a precise re-verification checklist.
+- [x] Make `/admin` the canonical CMS entry route and redirect `/admin/articles` to `/admin` without changing public website URLs.
+- [x] Remove Google and Manus OAuth from the CMS login flow and add email-and-password authentication with a persistent secure session and optional Remember Me duration.
+- [x] Make `albert.aranbaev@gmail.com` the immutable primary administrator and create a secure one-time password-setup path instead of hardcoding a password.
+- [x] Add password credential storage using a memory-hard password hash, session-version invalidation, login throttling, and generic authentication errors.
+- [x] Add administrator invitations with pending, accepted, revoked, and expired states plus single-use hashed setup tokens.
+- [x] Add single-use password-reset tokens and password-reset request/confirmation flows that do not reveal whether an email exists.
+- [x] Add server-side administrator authorization for the primary administrator and accepted invited users only.
+- [x] Add administrator-only procedures to list users and invitations, invite users, resend invitations, revoke invitations, change roles, and remove active users.
+- [x] Prevent removal of the primary administrator and immediately invalidate sessions for removed administrators.
+- [x] Use the protected `RESEND_API_KEY` server secret for invitation and password-reset emails, with production-safe sender and base-URL configuration.
+- [x] Build `/admin` login, forgot-password, set-password, and reset-password screens with accessible loading, success, and error states.
+- [x] Build the administrator management interface for active users and pending invitations under `/admin`.
+- [x] Add Vitest coverage for password hashing, token hashing and expiry, generic login/reset behavior, primary-admin protection, invitation lifecycle, user removal, session invalidation, route redirects, and Resend request construction.
+- [x] Validate migrations, `/admin` login and recovery flows, invitations, removal, responsive UI, TypeScript, tests, production build, and runtime logs.
+- [x] Save and deliver the email-and-password CMS checkpoint with secure first-admin setup instructions.
+- [x] Add exactly two CMS roles: `admin` with full article and user-management access, and `content_manager` with article-management access only.
+- [x] Allow administrators to change invited and active non-primary users between Admin and Content Manager roles.
+- [x] Enforce Content Manager restrictions in both the backend procedures and frontend navigation so direct URL or API access cannot reach user administration.
+- [x] Prevent Content Managers from inviting users, deleting users, changing roles, viewing invitation tokens, or accessing any administrator-management data.
+- [x] Add role-change audit fields and test that role changes take effect immediately for the affected user’s next request.

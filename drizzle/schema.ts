@@ -1,4 +1,4 @@
-import { int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export type ArticleBlock = {
   type: "h2" | "h3" | "p" | "li";
@@ -21,7 +21,11 @@ export const users = mysqlTable("users", {
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "content_manager"]).default("content_manager").notNull(),
+  isPrimaryAdmin: boolean("isPrimaryAdmin").default(false).notNull(),
+  roleChangedAt: timestamp("roleChangedAt"),
+  roleChangedByUserId: int("roleChangedByUserId"),
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -29,6 +33,80 @@ export const users = mysqlTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+export const cmsCredentials = mysqlTable("cmsCredentials", {
+  userId: int("userId").primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: text("passwordHash"),
+  sessionVersion: int("sessionVersion").default(1).notNull(),
+  status: mysqlEnum("status", ["pending", "active", "disabled"]).default("pending").notNull(),
+  passwordChangedAt: timestamp("passwordChangedAt"),
+  lastSignedInAt: timestamp("lastSignedInAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CmsCredential = typeof cmsCredentials.$inferSelect;
+export type InsertCmsCredential = typeof cmsCredentials.$inferInsert;
+
+export const cmsInvitations = mysqlTable("cmsInvitations", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  role: mysqlEnum("role", ["admin", "content_manager"]).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  status: mysqlEnum("status", ["pending", "accepted", "revoked", "expired"]).default("pending").notNull(),
+  invitedByUserId: int("invitedByUserId").notNull(),
+  acceptedByUserId: int("acceptedByUserId"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  lastSentAt: timestamp("lastSentAt").defaultNow().notNull(),
+  sendCount: int("sendCount").default(1).notNull(),
+  acceptedAt: timestamp("acceptedAt"),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CmsInvitation = typeof cmsInvitations.$inferSelect;
+export type InsertCmsInvitation = typeof cmsInvitations.$inferInsert;
+
+export const passwordResetTokens = mysqlTable("passwordResetTokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  usedAt: timestamp("usedAt"),
+  revokedAt: timestamp("revokedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type InsertPasswordResetToken = typeof passwordResetTokens.$inferInsert;
+
+export const authAuditEvents = mysqlTable("authAuditEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  actorUserId: int("actorUserId"),
+  targetUserId: int("targetUserId"),
+  targetEmail: varchar("targetEmail", { length: 320 }),
+  action: mysqlEnum("action", [
+    "invited",
+    "invitation_resent",
+    "invitation_revoked",
+    "registered",
+    "password_reset_requested",
+    "password_reset_completed",
+    "role_changed",
+    "user_removed",
+    "user_restored",
+    "login_succeeded",
+    "login_failed",
+  ]).notNull(),
+  oldRole: mysqlEnum("oldRole", ["admin", "content_manager"]),
+  newRole: mysqlEnum("newRole", ["admin", "content_manager"]),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuthAuditEvent = typeof authAuditEvents.$inferSelect;
+export type InsertAuthAuditEvent = typeof authAuditEvents.$inferInsert;
 
 export const inquiries = mysqlTable("inquiries", {
   id: int("id").autoincrement().primaryKey(),

@@ -1,20 +1,45 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import { COOKIE_NAME } from "@shared/const";
+import { verifyCmsSessionToken } from "../cmsAuth";
+import { getCmsUserById, type CmsRole } from "../cmsDb";
+
+export type CmsContextUser = {
+  id: number;
+  openId: string;
+  name: string | null;
+  email: string;
+  role: CmsRole;
+  isPrimaryAdmin: boolean;
+  sessionVersion: number;
+};
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
+  user: CmsContextUser | null;
 };
 
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
-  let user: User | null = null;
+  let user: CmsContextUser | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    const claims = await verifyCmsSessionToken(opts.req.cookies?.[COOKIE_NAME]);
+    if (claims) {
+      const current = await getCmsUserById(claims.userId);
+      if (current && current.sessionVersion === claims.sessionVersion) {
+        user = {
+          id: current.id,
+          openId: current.openId,
+          name: current.name,
+          email: current.email,
+          role: current.role,
+          isPrimaryAdmin: current.isPrimaryAdmin,
+          sessionVersion: current.sessionVersion,
+        };
+      }
+    }
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;

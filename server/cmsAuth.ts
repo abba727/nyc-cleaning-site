@@ -1,0 +1,85 @@
+import { createHash, randomBytes } from "node:crypto";
+import argon2 from "argon2";
+import { jwtVerify, SignJWT } from "jose";
+import { ENV } from "./_core/env";
+
+export const CMS_SESSION_KIND = "nyc-cleaning-cms";
+export const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
+export const REMEMBER_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const RESET_TTL_MS = 60 * 60 * 1000;
+
+export type CmsSessionClaims = {
+  userId: number;
+  sessionVersion: number;
+};
+
+function sessionSecret() {
+  if (!ENV.cookieSecret) throw new Error("JWT_SECRET is required");
+  return new TextEncoder().encode(ENV.cookieSecret);
+}
+
+export function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export function createOpaqueToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashOpaqueToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export async function hashPassword(password: string) {
+  return argon2.hash(password, {
+    type: argon2.argon2id,
+    memoryCost: 19_456,
+    timeCost: 3,
+    parallelism: 1,
+  });
+}
+
+export async function verifyPassword(passwordHash: string, password: string) {
+  try {
+    return await argon2.verify(passwordHash, password);
+  } catch {
+    return false;
+  }
+}
+
+export async function createCmsSessionToken(
+  claims: CmsSessionClaims,
+  rememberMe: boolean,
+) {
+  const expiresInMs = rememberMe ? REMEMBER_SESSION_MS : SHORT_SESSION_MS;
+  const now = Date.now();
+  return new SignJWT({
+    kind: CMS_SESSION_KIND,
+    sv: claims.sessionVersion,
+  })
+    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setSubject(String(claims.userId))
+    .setIssuedAt(Math.floor(now / 1000))
+    .setExpirationTime(Math.floor((now + expiresInMs) / 1000))
+    .sign(sessionSecret());
+}
+
+export async function verifyCmsSessionToken(token: string | undefined | null): Promise<CmsSessionClaims | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, sessionSecret(), { algorithms: ["HS256"] });
+    const userId = Number(payload.sub);
+    const sessionVersion = Number(payload.sv);
+    if (payload.kind !== CMS_SESSION_KIND || !Number.isInteger(userId) || userId <= 0 || !Number.isInteger(sessionVersion)) {
+      return null;
+    }
+    return { userId, sessionVersion };
+  } catch {
+    return null;
+  }
+}
+
+export function isStrongPassword(password: string) {
+  return password.length >= 12 && /[a-z]/.test(password) && /[A-Z]/.test(password) && /\d/.test(password);
+}
