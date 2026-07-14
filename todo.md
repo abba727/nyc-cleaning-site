@@ -122,5 +122,6 @@
 - [x] Diagnose why the primary administrator password-setup request reports success but no email reaches `albert.aranbaev@gmail.com`.
 - [x] Correct the production account-state, sender, or delivery-path defect without weakening email-address privacy.
 - [x] Add sufficient production-safe logging and automated coverage for primary-administrator setup email delivery failures.
-- [ ] Validate the primary-administrator setup request against the live deployment and confirm the transactional email provider accepts it.
+- [x] Validate the primary-administrator setup request against the live deployment and confirm the transactional email provider accepts it.
 - [ ] Publish the email-delivery fix and provide accurate first-access instructions.
+- [ ] Fix the production server-rendering `React is not defined` error by aligning the server bundle with the automatic JSX runtime, then verify live CMS pages render successfully.
