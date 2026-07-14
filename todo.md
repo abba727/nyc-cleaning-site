@@ -141,3 +141,8 @@
 - [x] Improve invalid, expired, superseded, and over-attempt verification-code guidance without weakening generic security responses.
 - [x] Add regression coverage and responsive visual validation for the revised code-entry and password-reset/setup flows.
 - [x] Publish the corrected CMS credential experience and provide updated administrator instructions.
+- [x] Reproduce and diagnose why submitting valid-looking credentials on `/admin` produces no visible response or navigation.
+- [x] Fix CMS sign-in session establishment and dashboard navigation while preserving generic authentication errors and login throttling.
+- [x] Add a clear pending state and visible success or error feedback so the sign-in button never appears unresponsive.
+- [x] Add regression coverage and responsive browser validation for successful, invalid, and throttled sign-in attempts.
+- [x] Publish the sign-in fix and provide accurate CMS access guidance.

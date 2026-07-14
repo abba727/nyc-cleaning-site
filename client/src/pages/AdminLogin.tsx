@@ -6,23 +6,35 @@ import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import { Loader2, LockKeyhole } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { useLocation } from "wouter";
 
 export default function AdminLogin() {
-  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const login = trpc.auth.login.useMutation({
     onSuccess: async () => {
-      await utils.auth.me.invalidate();
-      setLocation("/admin");
+      setSessionError(null);
+      try {
+        await utils.auth.me.invalidate();
+        const user = await utils.auth.me.fetch();
+        if (!user) {
+          setSessionError("Your password was accepted, but the secure session could not be started. Please allow cookies for this site and try again.");
+          return;
+        }
+
+        utils.auth.me.setData(undefined, user);
+        window.location.replace("/admin");
+      } catch {
+        setSessionError("Your password was accepted, but the dashboard could not be opened. Please try again.");
+      }
     },
   });
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    setSessionError(null);
     login.mutate({ email, password, rememberMe });
   }
 
@@ -44,10 +56,10 @@ export default function AdminLogin() {
           <Checkbox checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} />
           Keep me signed in for 30 days
         </label>
-        {login.error ? <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{login.error.message}</p> : null}
-        <Button className="h-11 w-full bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={login.isPending}>
+        {login.error || sessionError ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sessionError ?? login.error?.message}</p> : null}
+        <Button type="submit" aria-busy={login.isPending} className="h-11 w-full bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={login.isPending}>
           {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
-          Sign in
+          {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
       </form>
     </AdminAuthShell>
