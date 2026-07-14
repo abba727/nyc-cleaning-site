@@ -123,5 +123,7 @@
 - [x] Correct the production account-state, sender, or delivery-path defect without weakening email-address privacy.
 - [x] Add sufficient production-safe logging and automated coverage for primary-administrator setup email delivery failures.
 - [x] Validate the primary-administrator setup request against the live deployment and confirm the transactional email provider accepts it.
-- [ ] Publish the email-delivery fix and provide accurate first-access instructions.
-- [ ] Fix the production server-rendering `React is not defined` error by aligning the server bundle with the automatic JSX runtime, then verify live CMS pages render successfully.
+- [x] Publish the email-delivery fix and provide accurate first-access instructions.
+- [x] Fix the production server-rendering `React is not defined` error by aligning the server bundle with the automatic JSX runtime, then verify live CMS pages render successfully.
+- [x] Deliver corrected first-access instructions using the actual managed production CMS URL because `www.nyccleaning.co` still serves the former WordPress site.
+- [x] Verify the published `/admin`, invitation setup, password reset, and protected user-management routes no longer fail during production server rendering.
