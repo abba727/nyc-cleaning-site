@@ -23,7 +23,7 @@ function isSecureRequest(req: Request) {
 
 export function getSessionCookieOptions(
   req: Request
-): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+): Pick<CookieOptions, "domain" | "httpOnly" | "partitioned" | "path" | "sameSite" | "secure"> {
   // const hostname = req.hostname;
   // const shouldSetDomain =
   //   hostname &&
@@ -43,6 +43,7 @@ export function getSessionCookieOptions(
 
   return {
     httpOnly: true,
+    partitioned: secure,
     path: "/",
     sameSite: secure ? "none" : "lax",
     secure,

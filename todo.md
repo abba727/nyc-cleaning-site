@@ -150,3 +150,7 @@
 - [x] Correct production session-cookie issuance or parsing while preserving `HttpOnly`, HTTPS-only transport, login throttling, and 30-day remember-me behavior.
 - [x] Add an integration regression test that proves a successful login cookie authenticates the next request.
 - [ ] Verify successful sign-in on the managed HTTPS domain and publish the production session repair.
+- [x] Support secure CMS sessions when the login page is embedded in a browser context that blocks ordinary third-party cookies.
+- [x] Add a separate “Remember my email address” option that persists only the normalized email and never stores the password.
+- [x] Add automated coverage for partitioned secure cookies and remembered-email privacy behavior.
+- [ ] Revalidate the CMS login page responsively, publish the repair, and obtain a successful administrator sign-in confirmation.

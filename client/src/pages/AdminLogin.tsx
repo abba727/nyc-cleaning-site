@@ -3,16 +3,27 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { normalizeCmsEmail, readRememberedCmsEmail, updateRememberedCmsEmail } from "@/lib/rememberedEmail";
 import { trpc } from "@/lib/trpc";
 import { Loader2, LockKeyhole } from "lucide-react";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 export default function AdminLogin() {
   const utils = trpc.useUtils();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const rememberedEmail = readRememberedCmsEmail(window.localStorage);
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberEmail(true);
+    }
+  }, []);
+
   const login = trpc.auth.login.useMutation({
     onSuccess: async () => {
       setSessionError(null);
@@ -35,7 +46,10 @@ export default function AdminLogin() {
   function submit(event: FormEvent) {
     event.preventDefault();
     setSessionError(null);
-    login.mutate({ email, password, rememberMe });
+    const normalizedEmail = normalizeCmsEmail(email);
+    updateRememberedCmsEmail(window.localStorage, normalizedEmail, rememberEmail);
+    setEmail(normalizedEmail);
+    login.mutate({ email: normalizedEmail, password, rememberMe });
   }
 
   return (
@@ -52,10 +66,25 @@ export default function AdminLogin() {
           </div>
           <Input id="cms-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
         </div>
-        <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600">
-          <Checkbox checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} />
-          Keep me signed in for 30 days
-        </label>
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600" htmlFor="remember-session">
+            <Checkbox id="remember-session" checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} />
+            Keep me signed in for 30 days
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600" htmlFor="remember-email">
+            <Checkbox
+              id="remember-email"
+              checked={rememberEmail}
+              onCheckedChange={value => {
+                const shouldRemember = value === true;
+                setRememberEmail(shouldRemember);
+                if (!shouldRemember) updateRememberedCmsEmail(window.localStorage, email, false);
+              }}
+            />
+            Remember my email address
+          </label>
+          <p className="pl-7 text-xs leading-5 text-slate-500">Your password is never stored.</p>
+        </div>
         {login.error || sessionError ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sessionError ?? login.error?.message}</p> : null}
         <Button type="submit" aria-busy={login.isPending} className="h-11 w-full bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={login.isPending}>
           {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
