@@ -149,14 +149,14 @@
 - [x] Trace why production accepts valid CMS credentials but the immediately following `auth.me` request has no authenticated session.
 - [x] Correct production session-cookie issuance or parsing while preserving `HttpOnly`, HTTPS-only transport, login throttling, and 30-day remember-me behavior.
 - [x] Add an integration regression test that proves a successful login cookie authenticates the next request.
-- [ ] Verify successful sign-in on the managed HTTPS domain and publish the production session repair.
+- [x] Verify successful sign-in on the managed HTTPS domain and publish the production session repair.
 - [x] Support secure CMS sessions when the login page is embedded in a browser context that blocks ordinary third-party cookies.
 - [x] Add a separate “Remember my email address” option that persists only the normalized email and never stores the password.
 - [x] Add automated coverage for partitioned secure cookies and remembered-email privacy behavior.
-- [ ] Revalidate the CMS login page responsively, publish the repair, and obtain a successful administrator sign-in confirmation.
+- [x] Revalidate the CMS login page responsively, publish the repair, and obtain a successful administrator sign-in confirmation.
 - [x] Replace the CMS cookie-only dependency with a secure bearer-session fallback for browsers that reject both ordinary and partitioned cookies.
 - [x] Ensure non-remembered bearer sessions use session-only browser storage and 30-day remembered sessions use persistent storage, without storing passwords.
 - [x] Clear all cookie and bearer session state on logout and preserve immediate role/session-version invalidation server-side.
 - [x] Eliminate the visible flash of unstyled public-site HTML by ensuring critical shell styles are applied before the first paint.
 - [x] Add end-to-end regression coverage for login-token issuance, Authorization-header authentication, logout cleanup, remembered-session storage selection, and pre-paint styling.
-- [ ] Validate the combined authentication and no-FOUC repair in desktop/mobile browsers, publish it, and confirm the live behavior.
+- [x] Validate the combined authentication and no-FOUC repair in desktop/mobile browsers, publish it, and confirm the live behavior.
