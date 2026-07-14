@@ -55,10 +55,10 @@ export default function AdminUsers() {
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><MailPlus className="h-5 w-5 text-[#14846f]" />Invite a user</CardTitle><CardDescription>Invitations expire after seven days and can be used once.</CardDescription></CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-[minmax(240px,1fr)_220px_auto] md:items-end" onSubmit={submitInvitation}>
-            <div className="space-y-2"><Label htmlFor="invite-user-email">Email address</Label><Input id="invite-user-email" type="email" value={email} onChange={event => setEmail(event.target.value)} required /></div>
-            <div className="space-y-2"><Label>Role</Label><Select value={role} onValueChange={value => setRole(value as CmsRole)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="content_manager">Content Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
-            <Button className="bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={invite.isPending}>{invite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailPlus className="h-4 w-4" />}Send invitation</Button>
+          <form className="grid gap-4 md:grid-cols-[minmax(280px,1fr)_220px_180px] md:items-end" onSubmit={submitInvitation}>
+            <div className="grid gap-2"><Label className="flex min-h-5 items-center" htmlFor="invite-user-email">Email address</Label><Input className="h-11 bg-white" id="invite-user-email" type="email" value={email} onChange={event => setEmail(event.target.value)} required /></div>
+            <div className="grid gap-2"><Label className="flex min-h-5 items-center" htmlFor="invite-user-role">Role</Label><Select value={role} onValueChange={value => setRole(value as CmsRole)}><SelectTrigger className="w-full data-[size=default]:h-11" id="invite-user-role"><SelectValue /></SelectTrigger><SelectContent align="start"><SelectItem value="content_manager">Content Manager</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent></Select></div>
+            <Button className="h-11 w-full bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={invite.isPending}>{invite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MailPlus className="h-4 w-4" />}Send invitation</Button>
           </form>
           {invite.error ? <p role="alert" className="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{invite.error.message}</p> : null}
         </CardContent>

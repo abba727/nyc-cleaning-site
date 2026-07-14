@@ -160,3 +160,6 @@
 - [x] Eliminate the visible flash of unstyled public-site HTML by ensuring critical shell styles are applied before the first paint.
 - [x] Add end-to-end regression coverage for login-token issuance, Authorization-header authentication, logout cleanup, remembered-session storage selection, and pre-paint styling.
 - [x] Validate the combined authentication and no-FOUC repair in desktop/mobile browsers, publish it, and confirm the live behavior.
+- [x] Align the CMS invite-user email, role selector, and send-invitation button on a consistent baseline across desktop and mobile layouts.
+- [x] Give CMS role dropdown menus a fully opaque surface, correct foreground contrast, and sufficient stacking so underlying cards never show through.
+- [x] Add regression coverage and responsive visual validation for the corrected CMS invitation controls before publishing.
