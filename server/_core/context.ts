@@ -1,5 +1,6 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { COOKIE_NAME } from "@shared/const";
+import { parse as parseCookieHeader } from "cookie";
 import { verifyCmsSessionToken } from "../cmsAuth";
 import { getCmsUserById, type CmsRole } from "../cmsDb";
 
@@ -25,7 +26,8 @@ export async function createContext(
   let user: CmsContextUser | null = null;
 
   try {
-    const claims = await verifyCmsSessionToken(opts.req.cookies?.[COOKIE_NAME]);
+    const requestCookies = opts.req.cookies ?? parseCookieHeader(opts.req.headers.cookie ?? "");
+    const claims = await verifyCmsSessionToken(requestCookies[COOKIE_NAME]);
     if (claims) {
       const current = await getCmsUserById(claims.userId);
       if (current && current.sessionVersion === claims.sessionVersion) {

@@ -10,15 +10,53 @@ vi.mock("./cmsDb", () => ({ getCmsUserById: mocks.getCmsUserById }));
 
 import { createContext } from "./_core/context";
 
-function options() {
+function options(cookieSource: "header" | "middleware" = "header") {
   return {
-    req: { cookies: { "app_session_id": "session-token" } },
+    req: cookieSource === "header"
+      ? { headers: { cookie: "other=value; app_session_id=session-token" } }
+      : { headers: {}, cookies: { "app_session_id": "session-token" } },
     res: {},
   } as Parameters<typeof createContext>[0];
 }
 
 describe("role changes on the next authenticated request", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("authenticates the next request from the raw Cookie header used in production", async () => {
+    mocks.verifyCmsSessionToken.mockResolvedValue({ userId: 7, sessionVersion: 2 });
+    mocks.getCmsUserById.mockResolvedValue({
+      id: 7,
+      openId: "cms:7",
+      name: "Editor",
+      email: "editor@example.com",
+      role: "content_manager",
+      isPrimaryAdmin: false,
+      sessionVersion: 2,
+    });
+
+    const context = await createContext(options("header"));
+
+    expect(mocks.verifyCmsSessionToken).toHaveBeenCalledWith("session-token");
+    expect(context.user).toMatchObject({ id: 7, role: "content_manager", sessionVersion: 2 });
+  });
+
+  it("retains compatibility with middleware-populated request cookies", async () => {
+    mocks.verifyCmsSessionToken.mockResolvedValue({ userId: 7, sessionVersion: 2 });
+    mocks.getCmsUserById.mockResolvedValue({
+      id: 7,
+      openId: "cms:7",
+      name: "Editor",
+      email: "editor@example.com",
+      role: "content_manager",
+      isPrimaryAdmin: false,
+      sessionVersion: 2,
+    });
+
+    const context = await createContext(options("middleware"));
+
+    expect(mocks.verifyCmsSessionToken).toHaveBeenCalledWith("session-token");
+    expect(context.user).toMatchObject({ id: 7, role: "content_manager" });
+  });
 
   it("rejects the prior session immediately and applies the updated role to a refreshed session", async () => {
     mocks.getCmsUserById.mockResolvedValue({

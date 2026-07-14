@@ -146,3 +146,7 @@
 - [x] Add a clear pending state and visible success or error feedback so the sign-in button never appears unresponsive.
 - [x] Add regression coverage and responsive browser validation for successful, invalid, and throttled sign-in attempts.
 - [x] Publish the sign-in fix and provide accurate CMS access guidance.
+- [x] Trace why production accepts valid CMS credentials but the immediately following `auth.me` request has no authenticated session.
+- [x] Correct production session-cookie issuance or parsing while preserving `HttpOnly`, HTTPS-only transport, login throttling, and 30-day remember-me behavior.
+- [x] Add an integration regression test that proves a successful login cookie authenticates the next request.
+- [ ] Verify successful sign-in on the managed HTTPS domain and publish the production session repair.
