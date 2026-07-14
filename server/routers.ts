@@ -188,10 +188,11 @@ export const appRouter = router({
       const reset = await createPasswordReset(input.email);
       if (reset) {
         try {
-          await sendPasswordResetEmail({
+          const delivery = await sendPasswordResetEmail({
             to: reset.email,
             resetUrl: `${ENV.appBaseUrl}/admin/reset-password?token=${encodeURIComponent(reset.token)}`,
           });
+          console.info("[CMS Auth] Password reset email accepted by provider", { messageId: delivery?.id ?? "unknown" });
         } catch (error) {
           console.error("[CMS Auth] Password reset email could not be sent", error);
         }
@@ -199,10 +200,11 @@ export const appRouter = router({
         const setup = await createPrimaryAdminSetup(input.email);
         if (setup) {
           try {
-            await sendPrimaryAdminSetupEmail({
+            const delivery = await sendPrimaryAdminSetupEmail({
               to: setup.email,
               setupUrl: `${ENV.appBaseUrl}/admin/register?token=${encodeURIComponent(setup.token)}`,
             });
+            console.info("[CMS Auth] Primary administrator setup email accepted by provider", { messageId: delivery?.id ?? "unknown" });
           } catch (error) {
             console.error("[CMS Auth] Primary administrator setup email could not be sent", error);
           }

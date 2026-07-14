@@ -241,8 +241,8 @@ export async function createPasswordReset(emailInput: string) {
 export async function createPrimaryAdminSetup(emailInput: string) {
   const email = normalizeEmail(emailInput);
   if (email !== normalizeEmail(ENV.primaryAdminEmail)) return null;
-  const credential = await getCredentialByEmail(email);
-  if (!credential || credential.deletedAt || !credential.isPrimaryAdmin) return null;
+  const credential = await ensurePrimaryAdminAccount();
+  if (credential.deletedAt || !credential.isPrimaryAdmin) return null;
   if (credential.status === "active" || credential.passwordHash) return null;
   return createInvitation({ email, role: "admin", actorUserId: credential.userId });
 }
@@ -345,22 +345,38 @@ export async function ensurePrimaryAdminAccount() {
   let credential = await getCredentialByEmail(email);
   if (!credential) {
     const now = new Date();
-    const result = await db.insert(users).values({
-      openId: localOpenId(email),
-      email,
-      name: "Albert Aranbaev",
-      loginMethod: "password",
-      role: "admin",
-      isPrimaryAdmin: true,
-      roleChangedAt: now,
-    }).$returningId();
-    const userId = result[0]?.id;
+    const existingUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    let userId = existingUsers[0]?.id;
+    if (!userId) {
+      const result = await db.insert(users).values({
+        openId: localOpenId(email),
+        email,
+        name: "Albert Aranbaev",
+        loginMethod: "password",
+        role: "admin",
+        isPrimaryAdmin: true,
+        roleChangedAt: now,
+      }).$returningId();
+      userId = result[0]?.id;
+    } else {
+      await db.update(users).set({
+        loginMethod: "password",
+        role: "admin",
+        isPrimaryAdmin: true,
+        deletedAt: null,
+        roleChangedAt: now,
+      }).where(eq(users.id, userId));
+    }
     if (!userId) throw new Error("PRIMARY_ADMIN_CREATION_FAILED");
-    await db.insert(cmsCredentials).values({ userId, email, status: "disabled" });
-    credential = await getCredentialByEmail(email);
+    await db.insert(cmsCredentials).values({ userId, email, status: "pending" });
   } else {
     await db.update(users).set({ role: "admin", isPrimaryAdmin: true, deletedAt: null }).where(eq(users.id, credential.userId));
   }
+  credential = await getCredentialByEmail(email);
   if (!credential) throw new Error("PRIMARY_ADMIN_CREATION_FAILED");
   return credential;
 }

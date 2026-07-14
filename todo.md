@@ -119,3 +119,8 @@
 - [x] Enforce Content Manager restrictions in both the backend procedures and frontend navigation so direct URL or API access cannot reach user administration.
 - [x] Prevent Content Managers from inviting users, deleting users, changing roles, viewing invitation tokens, or accessing any administrator-management data.
 - [x] Add role-change audit fields and test that role changes take effect immediately for the affected user’s next request.
+- [x] Diagnose why the primary administrator password-setup request reports success but no email reaches `albert.aranbaev@gmail.com`.
+- [x] Correct the production account-state, sender, or delivery-path defect without weakening email-address privacy.
+- [x] Add sufficient production-safe logging and automated coverage for primary-administrator setup email delivery failures.
+- [ ] Validate the primary-administrator setup request against the live deployment and confirm the transactional email provider accepts it.
+- [ ] Publish the email-delivery fix and provide accurate first-access instructions.
