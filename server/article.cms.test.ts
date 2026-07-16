@@ -14,9 +14,11 @@ const dbMocks = vi.hoisted(() => ({
 }));
 
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
+const imageGenerationMocks = vi.hoisted(() => ({ generateImage: vi.fn() }));
 
 vi.mock("./db", () => dbMocks);
 vi.mock("./storage", () => storageMocks);
+vi.mock("./_core/imageGeneration", () => imageGenerationMocks);
 vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn() }));
 
 import { appRouter } from "./routers";
@@ -120,5 +122,37 @@ describe("article CMS authorization and contracts", () => {
       expect.any(Buffer),
       "image/png",
     );
+  });
+
+  it("lets a content manager generate a durable AI cover without changing the article automatically", async () => {
+    imageGenerationMocks.generateImage.mockResolvedValue({
+      key: "generated/nyc-lobby.png",
+      url: "/manus-storage/nyc-lobby.png",
+    });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    const result = await caller.article.generateCover({
+      title: "How to Keep a Lobby Ready for Residents",
+      excerpt: "A practical maintenance plan for high-traffic New York entrances.",
+      prompt: "A realistic building porter maintaining a bright Manhattan apartment lobby",
+    });
+
+    expect(result).toEqual({
+      key: "generated/nyc-lobby.png",
+      url: "/manus-storage/nyc-lobby.png",
+    });
+    expect(imageGenerationMocks.generateImage).toHaveBeenCalledWith({
+      prompt: expect.stringContaining("horizontal 3:2 website cover"),
+    });
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+  });
+
+  it("denies non-CMS users access to AI cover generation", async () => {
+    const caller = appRouter.createCaller(context(user({ openId: "not-an-owner", role: "user" })));
+
+    await expect(caller.article.generateCover({
+      prompt: "A realistic New York apartment lobby prepared for the morning rush",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(imageGenerationMocks.generateImage).not.toHaveBeenCalled();
   });
 });

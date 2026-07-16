@@ -203,3 +203,14 @@
 - [x] Validate the repaired production-equivalent login flow, all Vitest suites, TypeScript, production build, responsive login UI, and authentication logs.
 - [x] Publish the urgent CMS login-session repair and verify the live administrator route accepts a valid issued session.
 - [x] Push the repaired release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Review the required scheduling, periodic-update, AI image-generation, and durable-storage guidance before designing the Insight workflow.
+- [x] Audit the article schema, public visibility queries, CMS editor, role permissions, and current cover-image storage path.
+- [x] Add a publish date and time control so drafts and future-dated Insights stay hidden and automatically become public at the selected time.
+- [x] Display clear Draft, Scheduled, and Published states in the CMS without changing the visibility of existing published Insights.
+- [x] Add an authenticated “Generate Image with AI” workflow to the Insight editor with prompt input, loading/error states, preview, regeneration, and explicit image selection.
+- [x] Persist selected generated images to durable project storage and save the resulting article cover URL without exposing server credentials to the browser.
+- [x] Enlarge the excerpt editor so bloggers can comfortably review and edit multi-line summaries on desktop and mobile.
+- [x] Confirm the existing `publishedAt` field requires no schema migration and add regression coverage for scheduled visibility, CMS permissions, image-generation persistence, and editor behavior.
+- [x] Validate scheduling, generated-image selection, responsive CMS UI, Vitest, TypeScript, production build, and runtime logs.
+- [x] Publish the completed Insight scheduling and AI image workflow.
+- [ ] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.

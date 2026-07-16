@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { articles, inquiries, inquiryResponses, InsertArticle, InsertInquiry, InsertInquiryResponse, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -181,20 +181,29 @@ export async function countRecentInquiriesByEmail(email: string, since: Date) {
 export async function listPublishedArticles() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const now = new Date();
   return db
     .select()
     .from(articles)
-    .where(eq(articles.status, "published"))
+    .where(and(
+      eq(articles.status, "published"),
+      or(isNull(articles.publishedAt), lte(articles.publishedAt, now)),
+    ))
     .orderBy(desc(articles.publishedAt), desc(articles.id));
 }
 
 export async function getPublishedArticleByPath(path: string) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
+  const now = new Date();
   const rows = await db
     .select()
     .from(articles)
-    .where(and(eq(articles.path, path), eq(articles.status, "published")))
+    .where(and(
+      eq(articles.path, path),
+      eq(articles.status, "published"),
+      or(isNull(articles.publishedAt), lte(articles.publishedAt, now)),
+    ))
     .limit(1);
   return rows[0] ?? null;
 }

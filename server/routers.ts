@@ -4,6 +4,7 @@ import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { generateImage } from "./_core/imageGeneration";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -463,6 +464,36 @@ export const appRouter = router({
         input.mimeType,
       );
       return result;
+    }),
+    generateCover: adminProcedure.input(z.object({
+      prompt: z.string().trim().min(10).max(1200),
+      title: z.string().trim().max(512).optional(),
+      excerpt: z.string().trim().max(1200).optional(),
+    })).mutation(async ({ input }) => {
+      const context = [
+        input.title ? `Article title: ${input.title}.` : "",
+        input.excerpt ? `Article summary: ${input.excerpt}.` : "",
+      ].filter(Boolean).join(" ");
+      const prompt = [
+        "Create a realistic, premium editorial cover photograph for NYC Cleaning and Maintenance, a professional New York City property cleaning company.",
+        context,
+        `Creative direction: ${input.prompt}`,
+        "Use believable New York property details, clean natural lighting, navy and subtle teal visual accents, and a polished commercial photography style.",
+        "Do not include text, logos, watermarks, distorted architecture, unsafe cleaning practices, or exaggerated before-and-after effects.",
+        "Compose the image as a horizontal 3:2 website cover with a clear focal point and enough visual breathing room for responsive cropping.",
+      ].filter(Boolean).join(" ");
+
+      try {
+        const result = await generateImage({ prompt });
+        if (!result.url) throw new Error("The image service returned no image URL.");
+        return { url: result.url, key: result.key ?? null } as const;
+      } catch (error) {
+        console.error("[Article] AI cover generation failed", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "The image could not be generated. Please adjust the prompt and try again.",
+        });
+      }
     }),
   }),
 });
