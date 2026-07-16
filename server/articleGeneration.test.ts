@@ -21,6 +21,19 @@ function validGeneratedArticle() {
   ].join("\n\n");
 }
 
+function oversizedGeneratedArticle() {
+  const intro = Array.from({ length: 55 }, (_, index) => `intro${index + 1}`).join(" ");
+  const requirements = Array.from({ length: 110 }, (_, index) => `req${index + 1}`).join(" ");
+  const tradeoffs = Array.from({ length: 105 }, (_, index) => `pro${index + 1}`).join(" ");
+  return [
+    intro,
+    "## Understand the inspection requirement",
+    requirements,
+    "## Weigh practical benefits and limitations",
+    tradeoffs,
+  ].join("\n\n");
+}
+
 describe("topic-to-article generation", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -57,6 +70,34 @@ describe("topic-to-article generation", () => {
     await expect(generateArticleFromTopic("A cleaning schedule for high-traffic common areas")).resolves.toMatchObject({ article });
     expect(llmMocks.invokeLLM).toHaveBeenCalledTimes(2);
     expect(llmMocks.invokeLLM.mock.calls[1][0].messages[1].content).toContain("Revision requirement");
+  });
+
+  it("recovers when both model attempts exceed the maximum instead of rejecting the article", async () => {
+    const oversized = oversizedGeneratedArticle();
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    llmMocks.invokeLLM.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ article: oversized }) } }],
+    });
+
+    const result = await generateArticleFromTopic(
+      "NYC parapet inspection requirements, why inspections are needed, and their practical pros and cons",
+    );
+
+    expect(countArticleWords(oversized)).toBeGreaterThan(ARTICLE_GENERATED_WORDS.max);
+    expect(result.wordCount).toBeGreaterThanOrEqual(ARTICLE_GENERATED_WORDS.min);
+    expect(result.wordCount).toBeLessThanOrEqual(ARTICLE_GENERATED_WORDS.max);
+    expect(result.article.match(/^##\s+/gm)).toHaveLength(2);
+    expect(llmMocks.invokeLLM).toHaveBeenCalledTimes(2);
+    expect(llmMocks.invokeLLM.mock.calls[1][0].messages[1].content).toContain("Draft to revise");
+    expect(warnSpy).toHaveBeenCalledWith("[Article] Normalized oversized AI draft", expect.objectContaining({
+      originalWordCount: expect.any(Number),
+      finalWordCount: result.wordCount,
+      headingCount: 2,
+    }));
+
+    infoSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it("rejects a topic that is too short before calling the model", async () => {

@@ -541,7 +541,7 @@ export const appRouter = router({
         console.error("[Article] AI article generation failed", error);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "The article could not be generated. Refine the topic and try again.",
+          message: "The article generator could not produce a usable draft. Please try again; your topic remains in the editor.",
         });
       }
     }),

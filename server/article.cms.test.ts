@@ -251,6 +251,23 @@ describe("article CMS authorization and contracts", () => {
     expect(dbMocks.createArticle).not.toHaveBeenCalled();
   });
 
+  it("returns a safe, recoverable editor error when the article service cannot produce a usable draft", async () => {
+    articleGenerationMocks.generateArticleFromTopic.mockRejectedValue(new Error("Upstream response was unusable"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.generateArticle({
+      topic: "NYC parapet inspection requirements and practical advantages and limitations",
+    })).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+      message: expect.stringContaining("your topic remains in the editor"),
+    });
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+    expect(dbMocks.createArticle).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
   it("validates topic length and denies non-CMS users access to article generation", async () => {
     const editor = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
     await expect(editor.article.generateArticle({ topic: "Short" })).rejects.toMatchObject({

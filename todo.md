@@ -251,3 +251,10 @@
 - [x] Validate the corrected section on desktop and mobile, then run Vitest, TypeScript, production build, and current runtime-log checks.
 - [x] Publish the Who We Are image correction.
 - [x] Push the published correction and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Inspect production and local server evidence for the reported Generate Article failure using the submitted NYC parapet-inspection topic.
+- [x] Reproduce the failure through the authenticated article-generation procedure and identify whether the model request, response parsing, output validation, or authorization path is responsible.
+- [x] Repair Generate Article with resilient model invocation, useful server diagnostics, and a clear editor error while preserving authenticated Admin and Content Manager access.
+- [x] Add regression coverage for the discovered failure mode, accepted 170–230-word output, Markdown headings, and safe client error handling.
+- [x] Validate the exact reported topic against the real generation service, then run Vitest, TypeScript, production build, responsive CMS checks, and current runtime-log review.
+- [x] Publish the urgent Generate Article repair.
+- [ ] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
