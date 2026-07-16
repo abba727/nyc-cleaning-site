@@ -177,3 +177,8 @@
 - [x] Replace raw validation payloads with accessible field-level and form-level error messages across every public form.
 - [x] Add database migration, Vitest coverage, responsive browser validation, TypeScript checks, and production-build verification for the CRM and form changes.
 - [x] Publish the completed inquiry CRM and public-form improvements and verify the live paths.
+- [x] Trace the contact-page “Image generation failed” placeholder to its assigned production asset and identify the broken reference.
+- [x] Replace the failed contact hero asset with a verified, deployment-safe, brand-appropriate image while preserving the page layout and alt text.
+- [x] Audit all public page and service image assignments for failed or unresolved generation placeholders and add regression coverage.
+- [x] Validate corrected imagery at desktop and mobile sizes, run Vitest, TypeScript, and the production build, then review runtime logs.
+- [x] Publish the corrected contact-page imagery and confirm the live `/contact/` route no longer displays the failure placeholder.
