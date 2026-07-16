@@ -4,7 +4,6 @@ import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { storagePut } from "./storage";
@@ -353,11 +352,6 @@ export const appRouter = router({
       } catch (error) {
         console.error(`[Inquiry] Resend notification failed for ${inquiryId}`, error);
       }
-
-      void notifyOwner({
-        title: `New ${input.inquiryType === "quote" ? "quote request" : "contact inquiry"}: ${input.name}`,
-        content: [`Inquiry #${inquiryId}`, `Name: ${input.name}`, `Email: ${input.email}`, `Phone: ${displayUsPhone(phone)}`, `Service interest: ${input.serviceType}`, `Source page: ${input.sourcePath || "/contact/"}`, `Message: ${input.message}`].join("\n"),
-      }).catch(error => console.error(`[Inquiry] Owner notification failed for ${inquiryId}`, error));
 
       try {
         await updateInquiryNotificationStatus(inquiryId, notificationSent ? "sent" : "failed");

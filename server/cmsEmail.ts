@@ -50,7 +50,7 @@ export async function sendInquiryNotification(input: {
 }) {
   const response = await client().emails.send({
     from: requireProductionSender(),
-    to: "info@nyccleaning.co",
+    to: "info@fcmre.com",
     replyTo: input.email,
     subject: `New ${input.inquiryType === "quote" ? "quote request" : "contact inquiry"} #${input.inquiryId} from ${input.name}`,
     text: `New website inquiry #${input.inquiryId}\n\nName: ${input.name}\nEmail: ${input.email}\nPhone: ${input.phone}\nService: ${input.serviceType}\nSource: ${input.sourcePath}\n\nMessage:\n${input.message}`,

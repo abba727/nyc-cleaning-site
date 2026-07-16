@@ -182,3 +182,9 @@
 - [x] Audit all public page and service image assignments for failed or unresolved generation placeholders and add regression coverage.
 - [x] Validate corrected imagery at desktop and mobile sizes, run Vitest, TypeScript, and the production build, then review runtime logs.
 - [x] Publish the corrected contact-page imagery and confirm the live `/contact/` route no longer displays the failure placeholder.
+- [x] Trace why quote submissions trigger both Resend and a Manus-branded owner notification sent to the project owner’s Gmail.
+- [x] Remove the built-in Manus owner-notification call from public inquiry submissions while preserving CRM persistence and CMS response history.
+- [x] Change the fixed Resend inquiry recipient from info@nyccleaning.co to info@fcmre.com and preserve the visitor’s address as Reply-To.
+- [x] Add regression tests proving Resend is the sole notification path and every quote notification targets info@fcmre.com.
+- [x] Run the full Vitest suite, TypeScript checks, production build, and runtime-log review for the corrected email workflow.
+- [x] Publish the Resend-only inquiry delivery correction and confirm the live workflow no longer sends Manus-branded notifications.

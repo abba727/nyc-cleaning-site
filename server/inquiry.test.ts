@@ -50,6 +50,8 @@ describe("inquiry CRM procedures", () => {
     expect(result).toEqual({ success: true, inquiryId: 731, notificationSent: true });
     expect(dbMocks.createInquiry).toHaveBeenCalledWith(expect.objectContaining({ name: validInput.name, email: validInput.email, phone: "2125550198", notificationStatus: "pending" }));
     expect(emailMocks.sendInquiryNotification).toHaveBeenCalledWith(expect.objectContaining({ inquiryId: 731, email: validInput.email, phone: "(212) 555-0198", message: validInput.message }));
+    expect(emailMocks.sendInquiryNotification).toHaveBeenCalledTimes(1);
+    expect(notificationMocks.notifyOwner).not.toHaveBeenCalled();
     expect(dbMocks.updateInquiryNotificationStatus).toHaveBeenCalledWith(731, "sent");
   });
 
