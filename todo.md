@@ -232,4 +232,4 @@
 - [x] Add regression coverage for field order, authorization, body-derived generation, structured limits, click-only overwrite behavior, and UI state.
 - [x] Validate the generation workflow, responsive editor, Vitest, TypeScript, production build, and runtime logs.
 - [x] Publish the body-first SEO generation workflow.
-- [ ] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
