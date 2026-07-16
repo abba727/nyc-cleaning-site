@@ -257,4 +257,4 @@
 - [x] Add regression coverage for the discovered failure mode, accepted 170–230-word output, Markdown headings, and safe client error handling.
 - [x] Validate the exact reported topic against the real generation service, then run Vitest, TypeScript, production build, responsive CMS checks, and current runtime-log review.
 - [x] Publish the urgent Generate Article repair.
-- [ ] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
