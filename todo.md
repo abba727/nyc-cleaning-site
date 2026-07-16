@@ -250,4 +250,4 @@
 - [x] Add regression coverage that prevents known failure-placeholder assets or broken image URLs from returning to the Who We Are section.
 - [x] Validate the corrected section on desktop and mobile, then run Vitest, TypeScript, production build, and current runtime-log checks.
 - [x] Publish the Who We Are image correction.
-- [ ] Push the published correction and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published correction and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
