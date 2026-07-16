@@ -282,4 +282,4 @@
 - [x] Add regression coverage for body-based title suggestions, click-only title replacement, generated image descriptions, error handling, authorization, and save behavior.
 - [x] Validate both workflows with the configured AI services, responsive CMS checks, Vitest, TypeScript, production build, and current runtime-log review.
 - [x] Publish the title-suggestion and image-description release.
-- [ ] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
