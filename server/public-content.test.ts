@@ -4,8 +4,8 @@ import { brandAssets } from "../client/src/content/assets";
 import { serviceGroups, serviceName } from "../client/src/content/site";
 
 describe("public service content", () => {
-  it("does not assign the known failed-generation placeholders to public page heroes", () => {
-    const failedGenerationAssets = new Set([
+  it("does not assign known failed or retired placeholder assets to public page heroes", () => {
+    const blockedAssets = new Set([
       "/manus-storage/nyc-cleaning-about-team-v2_9f9c83de.png",
       "/manus-storage/nyc-cleaning-careers-v2_55866292.png",
       "/manus-storage/nyc-cleaning-contact-v2_f579150a.png",
@@ -13,13 +13,14 @@ describe("public service content", () => {
       "/manus-storage/nyc-cleaning-about-hero-20260716_0aa622d3.png",
       "/manus-storage/nyc-cleaning-careers-hero-20260716_d8637cd8.png",
       "/manus-storage/nyc-cleaning-service-area-hero-20260716_c7298907.png",
+      "/manus-storage/nyc-cleaning-staffing-v2_30b09bf9.png",
     ]);
 
     expect(brandAssets.contact).toBe("/manus-storage/nyc-cleaning-contact-hero-20260716_3e0ac94a.png");
-    expect(brandAssets.aboutTeam).toBe(brandAssets.staffing);
+    expect(brandAssets.aboutTeam).toBe("/manus-storage/nyc-cleaning-who-we-are-team-20260716_3cda4186.webp");
     expect(brandAssets.careers).toBe(brandAssets.janitorial);
     expect(brandAssets.serviceArea).toBe(brandAssets.propertyMaintenance);
-    expect([brandAssets.aboutTeam, brandAssets.careers, brandAssets.contact, brandAssets.serviceArea].every(asset => asset.startsWith("/manus-storage/") && !failedGenerationAssets.has(asset))).toBe(true);
+    expect([brandAssets.aboutTeam, brandAssets.careers, brandAssets.contact, brandAssets.serviceArea].every(asset => asset.startsWith("/manus-storage/") && !blockedAssets.has(asset))).toBe(true);
   });
 
   it("presents a concise grouped service taxonomy without repetitive NYC suffixes", () => {

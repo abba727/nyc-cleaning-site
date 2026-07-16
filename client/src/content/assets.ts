@@ -1,7 +1,7 @@
 export const brandAssets = {
   logo: "/manus-storage/nyc-cleaning-logo_aabc7372.webp",
   hero: "/manus-storage/nyc-cleaning-hero-v2_40f4e363.png",
-  aboutTeam: "/manus-storage/nyc-cleaning-staffing-v2_30b09bf9.png",
+  aboutTeam: "/manus-storage/nyc-cleaning-who-we-are-team-20260716_3cda4186.webp",
   careers: "/manus-storage/nyc-cleaning-janitorial-v2_90b970d8.png",
   contact: "/manus-storage/nyc-cleaning-contact-hero-20260716_3e0ac94a.png",
   serviceArea: "/manus-storage/nyc-cleaning-property-maintenance-v2_6606af1d.png",
