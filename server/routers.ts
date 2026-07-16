@@ -2,11 +2,13 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
+import { ARTICLE_BODY_MAX_GENERATION_LENGTH, ARTICLE_BODY_MIN_GENERATION_LENGTH } from "@shared/articleSeo";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, findArticleUrlConflict, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { generateImage } from "./_core/imageGeneration";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { generateArticleSeoFields } from "./articleSeoGeneration";
 import { storagePut } from "./storage";
 import {
   createCmsSessionToken,
@@ -509,6 +511,21 @@ export const appRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "The image could not be generated. Please adjust the prompt and try again.",
+        });
+      }
+    }),
+    generateSeoFields: adminProcedure.input(z.object({
+      body: z.string().trim()
+        .min(ARTICLE_BODY_MIN_GENERATION_LENGTH, `Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before generating supporting text.`)
+        .max(ARTICLE_BODY_MAX_GENERATION_LENGTH, `Keep the Article Body under ${ARTICLE_BODY_MAX_GENERATION_LENGTH.toLocaleString()} characters before generating supporting text.`),
+    })).mutation(async ({ input }) => {
+      try {
+        return await generateArticleSeoFields(input.body);
+      } catch (error) {
+        console.error("[Article] AI SEO field generation failed", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "The text could not be generated. Review the Article Body and try again.",
         });
       }
     }),

@@ -1,16 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
+import { ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_SEO_LIMITS } from "@shared/articleSeo";
 import { getArticlePublicationState, type ArticlePublicationState } from "@shared/articleScheduling";
 import { canonicalInsightPath, INSIGHT_CANONICAL_ROOT, normalizeArticleSlug } from "@shared/articleUrls";
 import { Check, Eye, FilePlus2, ImageUp, Pencil, Search, Sparkles, Trash2 } from "lucide-react";
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 type EditorStatus = "draft" | "published";
 type EditorFilterStatus = "all" | ArticlePublicationState;
+type GeneratedField = "all" | "excerpt" | "seoTitle" | "metaDescription";
+
+const GENERATED_FIELD_LABELS: Record<GeneratedField, string> = {
+  all: "supporting fields",
+  excerpt: "excerpt",
+  seoTitle: "SEO title",
+  metaDescription: "meta description",
+};
 
 type ArticleFormState = {
   id?: number;
@@ -86,6 +96,8 @@ export default function ArticleAdmin() {
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImage, setGeneratedImage] = useState<{ url: string; key: string | null } | null>(null);
   const [urlOverrides, setUrlOverrides] = useState({ slug: false, path: false });
+  const [generatingField, setGeneratingField] = useState<GeneratedField | null>(null);
+  const [generationErrors, setGenerationErrors] = useState<Partial<Record<GeneratedField, string>>>({});
   const perPage = 12;
 
   const createArticle = trpc.article.create.useMutation({
@@ -128,6 +140,7 @@ export default function ArticleAdmin() {
     },
     onError: error => toast.error(error.message),
   });
+  const generateSeoFields = trpc.article.generateSeoFields.useMutation();
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -184,6 +197,8 @@ export default function ArticleAdmin() {
     setImagePrompt("");
     setGeneratedImage(null);
     setUrlOverrides({ slug: false, path: false });
+    setGeneratingField(null);
+    setGenerationErrors({});
   };
 
   const selectArticle = (article: NonNullable<typeof articleQuery.data>[number]) => {
@@ -208,6 +223,8 @@ export default function ArticleAdmin() {
     setGeneratedImage(null);
     setImagePrompt("");
     setUrlOverrides({ slug: true, path: true });
+    setGeneratingField(null);
+    setGenerationErrors({});
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -252,6 +269,56 @@ export default function ArticleAdmin() {
     }
     generateCover.mutate({ prompt, title: form.title || undefined, excerpt: form.excerpt || undefined });
   };
+
+  const generateFromBody = async (target: GeneratedField) => {
+    const body = form.bodyText.trim();
+    setGenerationErrors(current => ({ ...current, [target]: undefined }));
+    if (body.length < ARTICLE_BODY_MIN_GENERATION_LENGTH) {
+      setGenerationErrors(current => ({
+        ...current,
+        [target]: `Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before generating ${GENERATED_FIELD_LABELS[target]}.`,
+      }));
+      return;
+    }
+
+    setGeneratingField(target);
+    try {
+      const result = await generateSeoFields.mutateAsync({ body });
+      setForm(current => ({
+        ...current,
+        ...(target === "all" || target === "excerpt" ? { excerpt: result.excerpt } : {}),
+        ...(target === "all" || target === "seoTitle" ? { seoTitle: result.seoTitle } : {}),
+        ...(target === "all" || target === "metaDescription" ? { metaDescription: result.metaDescription } : {}),
+      }));
+      toast.success(target === "all" ? "Excerpt and search fields generated. Review and edit them before saving." : `${GENERATED_FIELD_LABELS[target][0].toUpperCase()}${GENERATED_FIELD_LABELS[target].slice(1)} generated. Review and edit it before saving.`);
+    } catch (error) {
+      setGenerationErrors(current => ({
+        ...current,
+        [target]: error instanceof Error ? error.message : "The text could not be generated. Please try again.",
+      }));
+    } finally {
+      setGeneratingField(null);
+    }
+  };
+
+  const generateControl = (target: GeneratedField, guidance: ReactNode) => (
+    <>
+      <div className="admin-field-footer">
+        <small>{guidance}</small>
+        <button
+          type="button"
+          className="admin-generate-link"
+          onClick={() => void generateFromBody(target)}
+          disabled={generatingField !== null}
+          aria-label={`Generate ${GENERATED_FIELD_LABELS[target]} from Article Body`}
+        >
+          {generatingField === target ? <Spinner className="size-3.5" /> : <Sparkles aria-hidden="true" />}
+          {generatingField === target ? "Generating…" : target === "all" ? "Generate all" : "Generate"}
+        </button>
+      </div>
+      {generationErrors[target] ? <p className="admin-inline-error" role="alert">{generationErrors[target]}</p> : null}
+    </>
+  );
 
   const onCoverSelected = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -312,8 +379,8 @@ export default function ArticleAdmin() {
             <div className="admin-field admin-field-wide"><Label htmlFor="article-title">Title</Label><Input id="article-title" value={form.title} onChange={event => updateTitle(event.target.value)} /></div>
             <div className="admin-field"><Label htmlFor="article-slug">Slug</Label><Input id="article-slug" value={form.slug} onChange={event => updateSlug(event.target.value)} placeholder="generated-from-the-title" /><small>{form.id || urlOverrides.slug ? "Custom slug preserved. Edit only when you intentionally want a different URL." : "Generated automatically from the title."}</small></div>
             <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateCanonicalPath(event.target.value)} placeholder="/insights/generated-from-the-title/" /><small>{form.id || urlOverrides.path ? "Custom canonical path preserved." : "Generated automatically as /insights/{slug}/."}</small></div>
-            <div className="admin-field admin-field-wide"><Label htmlFor="article-excerpt">Excerpt</Label><Textarea id="article-excerpt" className="admin-excerpt-input" rows={8} value={form.excerpt} onChange={event => updateField("excerpt", event.target.value)} placeholder="Write the summary readers will see on the Insights page and in search previews." /><small>Use this larger workspace to shape a clear, useful summary before writing the full article.</small></div>
-            <div className="admin-field admin-field-wide"><Label htmlFor="article-body">Article body</Label><Textarea id="article-body" className="admin-body-input" rows={16} value={form.bodyText} onChange={event => updateField("bodyText", event.target.value)} placeholder="Use ## for section headings, ### for subheadings, and - for list items." /><small>Formatting: <strong>## Heading</strong>, <strong>### Subheading</strong>, <strong>- List item</strong>. Blank lines separate paragraphs.</small></div>
+            <div className="admin-field admin-field-wide"><Label htmlFor="article-body">Article Body</Label><Textarea id="article-body" className="admin-body-input" rows={16} value={form.bodyText} onChange={event => updateField("bodyText", event.target.value)} placeholder="Write the full article first. Use ## for section headings, ### for subheadings, and - for list items." />{generateControl("all", <>Formatting: <strong>## Heading</strong>, <strong>### Subheading</strong>, <strong>- List item</strong>. Generate all fills the three editable fields below.</>)}</div>
+            <div className="admin-field admin-field-wide"><Label htmlFor="article-excerpt">Excerpt</Label><Textarea id="article-excerpt" className="admin-excerpt-input" rows={8} value={form.excerpt} onChange={event => updateField("excerpt", event.target.value)} placeholder="Generate a summary from the Article Body, or write your own." />{generateControl("excerpt", `Generated excerpts use up to ${ARTICLE_SEO_LIMITS.excerpt} characters and remain fully editable.`)}</div>
             <div className="admin-field"><Label htmlFor="article-author">Author</Label><Input id="article-author" value={form.authorName} onChange={event => updateField("authorName", event.target.value)} /></div>
             <div className="admin-field"><Label htmlFor="article-status">Publishing</Label><select id="article-status" value={form.status} onChange={event => updateStatus(event.target.value as EditorStatus)}><option value="draft">Keep as draft</option><option value="published">Publish or schedule</option></select><small>Current state: <strong>{publicationLabel(currentPublicationState)}</strong></small></div>
             <div className="admin-field"><Label htmlFor="article-published-at">Publish date and time</Label><Input id="article-published-at" type="datetime-local" value={toDateTimeLocalValue(form.publishedAt)} onChange={event => updateField("publishedAt", event.target.value ? new Date(event.target.value) : null)} disabled={form.status === "draft"} /><small>{form.status === "draft" ? "Choose “Publish or schedule” to set a date." : isScheduled ? "This Insight will become public automatically at this time." : "Use the current or an earlier time to publish immediately."}</small></div>
@@ -343,8 +410,8 @@ export default function ArticleAdmin() {
           <div className="admin-subsection">
             <h3>Search preview</h3>
             <div className="admin-form-grid">
-              <div className="admin-field admin-field-wide"><Label htmlFor="article-seo-title">SEO title</Label><Input id="article-seo-title" value={form.seoTitle} onChange={event => updateField("seoTitle", event.target.value)} /></div>
-              <div className="admin-field admin-field-wide"><Label htmlFor="article-meta">Meta description</Label><Textarea id="article-meta" rows={3} value={form.metaDescription} onChange={event => updateField("metaDescription", event.target.value)} /></div>
+              <div className="admin-field admin-field-wide"><Label htmlFor="article-seo-title">SEO title</Label><Input id="article-seo-title" value={form.seoTitle} onChange={event => updateField("seoTitle", event.target.value)} placeholder="Generate from the Article Body, or write your own." />{generateControl("seoTitle", `Generated SEO titles use up to ${ARTICLE_SEO_LIMITS.seoTitle} characters.`)}</div>
+              <div className="admin-field admin-field-wide"><Label htmlFor="article-meta">Meta description</Label><Textarea id="article-meta" rows={3} value={form.metaDescription} onChange={event => updateField("metaDescription", event.target.value)} placeholder="Generate from the Article Body, or write your own." />{generateControl("metaDescription", `Generated meta descriptions use up to ${ARTICLE_SEO_LIMITS.metaDescription} characters.`)}</div>
             </div>
           </div>
 

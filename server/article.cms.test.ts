@@ -16,10 +16,12 @@ const dbMocks = vi.hoisted(() => ({
 
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const imageGenerationMocks = vi.hoisted(() => ({ generateImage: vi.fn() }));
+const seoGenerationMocks = vi.hoisted(() => ({ generateArticleSeoFields: vi.fn() }));
 
 vi.mock("./db", () => dbMocks);
 vi.mock("./storage", () => storageMocks);
 vi.mock("./_core/imageGeneration", () => imageGenerationMocks);
+vi.mock("./articleSeoGeneration", () => seoGenerationMocks);
 vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn() }));
 
 import { appRouter } from "./routers";
@@ -190,5 +192,43 @@ describe("article CMS authorization and contracts", () => {
       prompt: "A realistic New York apartment lobby prepared for the morning rush",
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(imageGenerationMocks.generateImage).not.toHaveBeenCalled();
+  });
+
+  it("lets a content manager generate editable supporting text from the Article Body without saving it", async () => {
+    const body = "A practical New York property cleaning article body with enough detailed guidance for the editor. ".repeat(4);
+    seoGenerationMocks.generateArticleSeoFields.mockResolvedValue({
+      seoTitle: "Practical Property Cleaning Planning",
+      metaDescription: "Plan routine property cleaning around building use, service windows, and a clearly documented scope.",
+      excerpt: "A useful framework for planning routine property cleaning around building needs and a clear service scope.",
+    });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.generateSeoFields({ body })).resolves.toEqual({
+      seoTitle: "Practical Property Cleaning Planning",
+      metaDescription: "Plan routine property cleaning around building use, service windows, and a clearly documented scope.",
+      excerpt: "A useful framework for planning routine property cleaning around building needs and a clear service scope.",
+    });
+    expect(seoGenerationMocks.generateArticleSeoFields).toHaveBeenCalledWith(body.trim());
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+    expect(dbMocks.createArticle).not.toHaveBeenCalled();
+  });
+
+  it("requires a sufficiently developed Article Body before generation", async () => {
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.generateSeoFields({ body: "Too short." })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringContaining("at least 200 characters"),
+    });
+    expect(seoGenerationMocks.generateArticleSeoFields).not.toHaveBeenCalled();
+  });
+
+  it("denies non-CMS users access to Article Body text generation", async () => {
+    const caller = appRouter.createCaller(context(user({ openId: "not-an-owner", role: "user" })));
+
+    await expect(caller.article.generateSeoFields({
+      body: "A sufficiently long article body that an ordinary user must not be allowed to submit for CMS generation. ".repeat(4),
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(seoGenerationMocks.generateArticleSeoFields).not.toHaveBeenCalled();
   });
 });

@@ -223,3 +223,13 @@
 - [x] Validate the editor workflow, Vitest, TypeScript, production build, responsive UI, and runtime logs.
 - [x] Publish the automatic Insight URL workflow.
 - [x] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Review the required server-side LLM integration and structured-output guidance for authenticated CMS text generation.
+- [x] Audit the Insight editor field order, article-body representation, SEO title, meta-description, excerpt limits, and current AI helper patterns.
+- [x] Add an authenticated server procedure that generates SEO title, meta description, and excerpt from the Article Body using validated structured output.
+- [x] Move Article Body before Excerpt so bloggers write the full article first, followed by generated supporting fields.
+- [x] Add a compact bottom-right Generate link beneath Article Body, Excerpt, SEO Title, and Meta Description fields with per-field loading and error states.
+- [x] Ensure generated text remains editable, never overwrites without a click, respects field limits, and gives clear guidance when the body is too short.
+- [x] Add regression coverage for field order, authorization, body-derived generation, structured limits, click-only overwrite behavior, and UI state.
+- [x] Validate the generation workflow, responsive editor, Vitest, TypeScript, production build, and runtime logs.
+- [x] Publish the body-first SEO generation workflow.
+- [ ] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
