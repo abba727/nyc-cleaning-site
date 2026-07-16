@@ -72,7 +72,7 @@ describe("CMS login session persistence", () => {
     });
   });
 
-  it("falls back to a valid Bearer token when a stale cookie is present", async () => {
+  it("falls back to a newly issued Bearer token when a signed but revoked cookie is present", async () => {
     mocks.getCmsUserById.mockResolvedValue({
       id: 41,
       openId: "cms:41",
@@ -82,18 +82,20 @@ describe("CMS login session persistence", () => {
       isPrimaryAdmin: true,
       sessionVersion: 3,
     });
-    const token = await createCmsSessionToken({ userId: 41, sessionVersion: 3 }, true);
+    const revokedCookieToken = await createCmsSessionToken({ userId: 41, sessionVersion: 2 }, true);
+    const freshBearerToken = await createCmsSessionToken({ userId: 41, sessionVersion: 3 }, true);
 
     const context = await createContext({
       req: {
         headers: {
-          cookie: `${COOKIE_NAME}=stale-cookie-value`,
-          authorization: `Bearer ${token}`,
+          cookie: `${COOKIE_NAME}=${revokedCookieToken}`,
+          authorization: `Bearer ${freshBearerToken}`,
         },
       },
       res: {},
     } as Parameters<typeof createContext>[0]);
 
+    expect(mocks.getCmsUserById).toHaveBeenCalledTimes(2);
     expect(context.user).toMatchObject({ id: 41, role: "admin", sessionVersion: 3 });
   });
 });

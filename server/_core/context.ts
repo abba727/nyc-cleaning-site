@@ -35,6 +35,24 @@ async function verifyOptionalCmsSessionToken(token: string | undefined) {
   }
 }
 
+async function resolveCmsContextUser(token: string | undefined): Promise<CmsContextUser | null> {
+  const claims = await verifyOptionalCmsSessionToken(token);
+  if (!claims) return null;
+
+  const current = await getCmsUserById(claims.userId);
+  if (!current || current.sessionVersion !== claims.sessionVersion) return null;
+
+  return {
+    id: current.id,
+    openId: current.openId,
+    name: current.name,
+    email: current.email,
+    role: current.role,
+    isPrimaryAdmin: current.isPrimaryAdmin,
+    sessionVersion: current.sessionVersion,
+  };
+}
+
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
@@ -42,22 +60,9 @@ export async function createContext(
 
   try {
     const requestCookies = opts.req.cookies ?? parseCookieHeader(opts.req.headers.cookie ?? "");
-    const cookieClaims = await verifyOptionalCmsSessionToken(requestCookies[COOKIE_NAME]);
-    const claims = cookieClaims
-      ?? await verifyOptionalCmsSessionToken(readBearerToken(opts.req.headers.authorization));
-    if (claims) {
-      const current = await getCmsUserById(claims.userId);
-      if (current && current.sessionVersion === claims.sessionVersion) {
-        user = {
-          id: current.id,
-          openId: current.openId,
-          name: current.name,
-          email: current.email,
-          role: current.role,
-          isPrimaryAdmin: current.isPrimaryAdmin,
-          sessionVersion: current.sessionVersion,
-        };
-      }
+    user = await resolveCmsContextUser(requestCookies[COOKIE_NAME]);
+    if (!user) {
+      user = await resolveCmsContextUser(readBearerToken(opts.req.headers.authorization));
     }
   } catch (error) {
     // Authentication is optional for public procedures.

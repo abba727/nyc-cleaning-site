@@ -196,3 +196,10 @@
 - [x] Validate desktop/mobile administrator behavior, run Vitest, TypeScript, production build, and review authentication runtime logs.
 - [x] Publish the corrected logout and administrator session-timeout workflow.
 - [x] Verify the selected `abba727/nyc-cleaning-site` repository, preserve its history, commit all completed project code, and push the validated release to GitHub.
+- [x] Reproduce the production failure where valid CMS credentials are accepted but the immediately issued secure session cannot be verified.
+- [x] Trace the login response token, cookie, bearer storage, session-version checks, and `auth.me` request to identify the exact post-login mismatch.
+- [x] Fix the session-verification regression without weakening server-side logout revocation or the three-hour administrator session lifetime.
+- [x] Add an end-to-end regression proving login establishes an authenticated CMS session, protected pages load, timeout handling works, and logout revokes the same session.
+- [x] Validate the repaired production-equivalent login flow, all Vitest suites, TypeScript, production build, responsive login UI, and authentication logs.
+- [x] Publish the urgent CMS login-session repair and verify the live administrator route accepts a valid issued session.
+- [ ] Push the repaired release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
