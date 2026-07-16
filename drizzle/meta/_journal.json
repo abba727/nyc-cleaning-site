@@ -50,6 +50,13 @@
       "when": 1784047117071,
       "tag": "0006_dry_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1784176718325,
+      "tag": "0007_cheerful_frightful_four",
+      "breakpoints": true
     }
   ]
 }

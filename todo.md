@@ -169,3 +169,11 @@
 - [x] Remove repetitive, vague, or internally focused service-page wording while preserving factual claims, route coverage, metadata intent, and canonical URLs.
 - [x] Add automated audits for service-page structure, brand voice, benefit count, CTA presence, related-service validity, and legacy URL preservation.
 - [x] Validate every revised service page at desktop and mobile sizes, run the full test/build suite, publish, and confirm the live result.
+- [x] Audit every public contact and quote form, the existing inquiry procedure, Resend delivery, database schema, and CMS role authorization.
+- [x] Route every valid public inquiry through Resend to info@nyccleaning.co with a professional submission summary and safe reply-to handling.
+- [x] Persist every inquiry as a CRM record with contact details, service context, original message, timestamps, status, and outbound response history.
+- [x] Add authorized CMS inquiry management with list, detail, status controls, and email replies sent through Resend.
+- [x] Add a US phone-number input mask and backend normalization while accepting common ten-digit formats without requiring +1.
+- [x] Replace raw validation payloads with accessible field-level and form-level error messages across every public form.
+- [x] Add database migration, Vitest coverage, responsive browser validation, TypeScript checks, and production-build verification for the CRM and form changes.
+- [x] Publish the completed inquiry CRM and public-form improvements and verify the live paths.

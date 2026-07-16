@@ -15,6 +15,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminRegister from "./pages/AdminRegister";
 import AdminResetPassword from "./pages/AdminResetPassword";
 import AdminUsers from "./pages/AdminUsers";
+import AdminInquiries from "./pages/AdminInquiries";
 
 function AdminEntry() {
   const { loading, user } = useAuth();
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/admin/forgot-password"><AdminForgotPassword /></Route>
       <Route path="/admin/reset-password"><AdminResetPassword /></Route>
       <Route path="/admin/users"><DashboardLayout><AdminUsers /></DashboardLayout></Route>
+      <Route path="/admin/inquiries"><DashboardLayout><AdminInquiries /></DashboardLayout></Route>
       <Route path="/admin/articles"><Redirect to="/admin" /></Route>
       <Route path="/admin"><AdminEntry /></Route>
       <Route>

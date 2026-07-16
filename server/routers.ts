@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
-import { countRecentInquiriesByEmail, createArticle, createInquiry, deleteArticle, getPublishedArticleByPath, listAllArticles, listPublishedArticles, updateArticle, updateInquiryNotificationStatus } from "./db";
+import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
@@ -30,7 +30,7 @@ import {
   removeCmsUser,
   revokeInvitation,
 } from "./cmsDb";
-import { sendInvitationEmail, sendPasswordResetEmail, sendPrimaryAdminSetupEmail } from "./cmsEmail";
+import { sendInquiryNotification, sendInquiryReply, sendInvitationEmail, sendPasswordResetEmail, sendPrimaryAdminSetupEmail } from "./cmsEmail";
 
 const inquiryInput = z.object({
   inquiryType: z.enum(["contact", "quote"]).default("quote"),
@@ -39,14 +39,27 @@ const inquiryInput = z.object({
   phone: z
     .string()
     .trim()
-    .min(7)
-    .max(48)
-    .refine(value => value.replace(/\D/g, "").length >= 7, "Enter a valid phone number"),
+    .min(10)
+    .max(24)
+    .refine(value => {
+      const digits = value.replace(/\D/g, "");
+      return digits.length === 10 || (digits.length === 11 && digits.startsWith("1"));
+    }, "Enter a valid 10-digit US phone number"),
   serviceType: z.string().trim().min(2).max(160),
   message: z.string().trim().min(10).max(5000),
   sourcePath: z.string().trim().max(512).default("/contact/"),
   website: z.string().max(0).optional(),
 });
+
+function normalizeUsPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
+function displayUsPhone(value: string) {
+  const digits = normalizeUsPhone(value);
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 const articleBlockInput = z.object({
   type: z.enum(["h2", "h3", "p", "li"]),
@@ -307,21 +320,16 @@ export const appRouter = router({
   inquiry: router({
     submit: publicProcedure.input(inquiryInput).mutation(async ({ input }) => {
       if (input.website) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid submission" });
-
       const since = new Date(Date.now() - 10 * 60 * 1000);
       const recentCount = await countRecentInquiriesByEmail(input.email, since);
-      if (recentCount >= 3) {
-        throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "Please wait a few minutes before sending another request.",
-        });
-      }
+      if (recentCount >= 3) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait a few minutes before sending another request." });
 
+      const phone = normalizeUsPhone(input.phone);
       const inquiryId = await createInquiry({
         inquiryType: input.inquiryType,
         name: input.name,
         email: input.email,
-        phone: input.phone,
+        phone,
         serviceType: input.serviceType,
         message: input.message,
         sourcePath: input.sourcePath || "/contact/",
@@ -329,26 +337,69 @@ export const appRouter = router({
         notificationStatus: "pending",
       });
 
-      const notificationSent = await notifyOwner({
+      let notificationSent = false;
+      try {
+        const delivery = await sendInquiryNotification({
+          inquiryId,
+          inquiryType: input.inquiryType,
+          name: input.name,
+          email: input.email,
+          phone: displayUsPhone(phone),
+          serviceType: input.serviceType,
+          message: input.message,
+          sourcePath: input.sourcePath || "/contact/",
+        });
+        notificationSent = Boolean(delivery?.id);
+      } catch (error) {
+        console.error(`[Inquiry] Resend notification failed for ${inquiryId}`, error);
+      }
+
+      void notifyOwner({
         title: `New ${input.inquiryType === "quote" ? "quote request" : "contact inquiry"}: ${input.name}`,
-        content: [
-          `Inquiry #${inquiryId}`,
-          `Name: ${input.name}`,
-          `Email: ${input.email}`,
-          `Phone: ${input.phone}`,
-          `Service interest: ${input.serviceType}`,
-          `Source page: ${input.sourcePath || "/contact/"}`,
-          `Message: ${input.message}`,
-        ].join("\n"),
-      });
+        content: [`Inquiry #${inquiryId}`, `Name: ${input.name}`, `Email: ${input.email}`, `Phone: ${displayUsPhone(phone)}`, `Service interest: ${input.serviceType}`, `Source page: ${input.sourcePath || "/contact/"}`, `Message: ${input.message}`].join("\n"),
+      }).catch(error => console.error(`[Inquiry] Owner notification failed for ${inquiryId}`, error));
 
       try {
         await updateInquiryNotificationStatus(inquiryId, notificationSent ? "sent" : "failed");
       } catch (error) {
         console.error(`[Inquiry] Could not update notification status for ${inquiryId}`, error);
       }
-
       return { success: true, inquiryId, notificationSent } as const;
+    }),
+    list: adminProcedure.query(() => listInquiries()),
+    detail: adminProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
+      const record = await getInquiryById(input.id);
+      if (!record) throw new TRPCError({ code: "NOT_FOUND", message: "Inquiry not found." });
+      return record;
+    }),
+    updateStatus: adminProcedure.input(z.object({ id: z.number().int().positive(), status: z.enum(["new", "contacted", "closed"]) })).mutation(async ({ input }) => {
+      await updateInquiryStatus(input.id, input.status);
+      return { success: true } as const;
+    }),
+    reply: adminProcedure.input(z.object({ id: z.number().int().positive(), subject: z.string().trim().min(3).max(320), message: z.string().trim().min(10).max(10000) })).mutation(async ({ input, ctx }) => {
+      const record = await getInquiryById(input.id);
+      if (!record) throw new TRPCError({ code: "NOT_FOUND", message: "Inquiry not found." });
+      const responseId = await createInquiryResponse({
+        inquiryId: input.id,
+        senderUserId: ctx.user.id,
+        senderName: ctx.user.name?.trim() || "NYC Cleaning Team",
+        senderEmail: ctx.user.email?.trim().toLowerCase() || "info@nyccleaning.co",
+        recipientEmail: record.inquiry.email,
+        subject: input.subject,
+        message: input.message,
+        deliveryStatus: "pending",
+      });
+      try {
+        const delivery = await sendInquiryReply({ to: record.inquiry.email, customerName: record.inquiry.name, subject: input.subject, message: input.message });
+        await updateInquiryResponseDelivery({ id: responseId, deliveryStatus: "sent", providerMessageId: delivery?.id ?? null });
+        await markInquiryResponded(input.id);
+        return { success: true, responseId } as const;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message.slice(0, 1000) : "Email delivery failed";
+        await updateInquiryResponseDelivery({ id: responseId, deliveryStatus: "failed", errorMessage });
+        console.error(`[Inquiry] CMS reply failed for inquiry ${input.id}`, error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The reply could not be sent. Your message was saved; please try again." });
+      }
     }),
   }),
   article: router({

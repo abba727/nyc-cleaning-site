@@ -148,6 +148,8 @@ p { margin: 0 0 1.2rem; }
 .form-grid label span { color: var(--navy); font-size: 0.84rem; font-weight: 700; }
 .form-grid input, .form-grid select, .form-grid textarea { width: 100%; border: 1px solid #cdd1d3; border-radius: 2px; background: var(--paper); color: var(--ink); padding: 0.72rem 0.8rem; font-size: 1rem; }
 .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus { border-color: var(--gold-dark); box-shadow: 0 0 0 3px rgb(91 201 192 / 0.2); outline: 0; }
+.form-grid [aria-invalid="true"] { border-color: #b42318; background: #fff8f7; }
+.field-error { color: #b42318; font-size: .76rem; font-weight: 700; line-height: 1.4; }
 .inquiry-form .button { margin-top: 1.2rem; }
 .form-note { margin: 0.7rem 0 0; color: var(--muted); font-size: 0.78rem; }
 .form-error { margin: 0.8rem 0 0; color: #a41f19; font-weight: 700; }
@@ -415,10 +417,54 @@ p { margin: 0 0 1.2rem; }
 .admin-access-state h1, .admin-access-state p { max-width: 620px; margin: 0; }
 .admin-access-state a { color: #006b5b; text-decoration: underline; }
 
+/* Inquiry CRM */
+.crm-workspace { --crm-border: #dce5e2; }
+.crm-toolbar { display: grid; grid-template-columns: minmax(240px, 1fr) 180px; gap: .75rem; margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--crm-border); border-radius: 14px; background: #fff; }
+.crm-toolbar select, .crm-status select { min-height: 40px; border: 1px solid #d6e1de; border-radius: 8px; padding: 0 .75rem; background: #fbfcfc; color: #172323; }
+.crm-grid { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.65fr); min-height: 640px; overflow: hidden; border: 1px solid var(--crm-border); border-radius: 16px; background: #fff; box-shadow: 0 18px 45px rgb(27 54 48 / .08); }
+.crm-list { max-height: calc(100vh - 250px); overflow-y: auto; border-right: 1px solid var(--crm-border); background: #f8faf9; }
+.crm-list-item { display: grid; width: 100%; gap: .28rem; padding: 1rem 1.1rem; border: 0; border-bottom: 1px solid #e7ecea; background: transparent; color: #32413f; text-align: left; cursor: pointer; transition: background 160ms var(--ease-out); }
+.crm-list-item:hover, .crm-list-item.is-active { background: #eaf5f2; }
+.crm-list-item.is-active { box-shadow: inset 4px 0 #007663; }
+.crm-list-top { display: flex; justify-content: space-between; gap: 1rem; color: #172323; }
+.crm-list-top time { color: #74817f; font-size: .72rem; font-weight: 500; }
+.crm-list-email { overflow: hidden; color: #70807d; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+.crm-list-item em, .crm-history-item em { justify-self: start; display: inline-flex; align-items: center; gap: .3rem; margin-top: .35rem; border-radius: 999px; padding: .2rem .55rem; color: #765b00; background: #fff2b3; font-size: .66rem; font-style: normal; font-weight: 800; text-transform: uppercase; }
+.crm-list-item em[data-status="contacted"], .crm-history-item em[data-status="sent"] { color: #00604f; background: #dff4ee; }
+.crm-list-item em[data-status="closed"] { color: #56615f; background: #e7ecea; }
+.crm-detail { min-width: 0; padding: clamp(1.1rem, 3vw, 2rem); }
+.crm-state { display: grid; min-height: 180px; place-items: center; align-content: center; gap: .7rem; padding: 2rem; color: #687774; text-align: center; }
+.crm-state-error { color: #a41f19; }
+.crm-contact-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+.crm-contact-heading h2 { margin: .2rem 0 .35rem; font-size: clamp(1.7rem, 3vw, 2.5rem); }
+.crm-contact-heading p { margin: 0; color: #687774; }
+.crm-status { display: grid; min-width: 140px; gap: .35rem; color: #52615e; font-size: .75rem; font-weight: 750; }
+.crm-contact-links { display: flex; flex-wrap: wrap; gap: .65rem 1.2rem; margin: 1.4rem 0; }
+.crm-contact-links a { display: inline-flex; align-items: center; gap: .45rem; color: #006b5b; font-weight: 700; }
+.crm-contact-links svg { width: 17px; }
+.crm-metadata { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin: 0 0 1.4rem; }
+.crm-metadata div { padding: .85rem; border-radius: 10px; background: #f3f7f6; }
+.crm-metadata dt { color: #71807d; font-size: .7rem; font-weight: 750; text-transform: uppercase; }
+.crm-metadata dd { margin: .3rem 0 0; overflow-wrap: anywhere; }
+.crm-message, .crm-history, .crm-reply { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--crm-border); }
+.crm-message h3, .crm-history h3, .crm-reply h3 { margin: 0 0 .55rem; font-size: 1rem; }
+.crm-message p, .crm-history-item p { margin: 0; color: #40514e; line-height: 1.7; white-space: pre-wrap; }
+.crm-history { display: grid; gap: .75rem; }
+.crm-history-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .55rem 1rem; padding: 1rem; border-radius: 12px; background: #f7faf9; }
+.crm-history-item > div { display: grid; gap: .2rem; }
+.crm-history-item span, .crm-muted, .crm-reply > div p { color: #71807d; font-size: .78rem; }
+.crm-history-item p { grid-column: 1 / -1; }
+.crm-history-item em svg { width: 13px; }
+.crm-reply { display: grid; gap: .9rem; }
+.crm-reply > div p { margin: 0; }
+.crm-reply label { display: grid; gap: .4rem; color: #40514e; font-size: .78rem; font-weight: 750; }
+.crm-reply button { justify-self: start; }
+
 @media (max-width: 1100px) {
   .admin-columns { grid-template-columns: 1fr; }
   .admin-library-panel { position: static; }
   .admin-article-list { max-height: none; }
+  .crm-grid { grid-template-columns: minmax(250px, .75fr) minmax(0, 1.25fr); }
 }
 
 @media (max-width: 720px) {
@@ -430,4 +476,12 @@ p { margin: 0 0 1.2rem; }
   .admin-library-filters { grid-template-columns: 1fr; }
   .admin-editor-actions { flex-direction: column-reverse; }
   .admin-editor-actions > div { display: grid; }
+  .crm-toolbar { grid-template-columns: 1fr; }
+  .crm-grid { display: block; }
+  .crm-list { max-height: 300px; border-right: 0; border-bottom: 1px solid var(--crm-border); }
+  .crm-contact-heading { flex-direction: column; }
+  .crm-status { width: 100%; }
+  .crm-metadata { grid-template-columns: 1fr; }
+  .crm-history-item { grid-template-columns: 1fr; }
+  .crm-history-item p { grid-column: auto; }
 }

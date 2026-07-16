@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gt } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { articles, inquiries, InsertArticle, InsertInquiry, InsertUser, users } from "../drizzle/schema";
+import { articles, inquiries, inquiryResponses, InsertArticle, InsertInquiry, InsertInquiryResponse, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -107,6 +107,63 @@ export async function updateInquiryNotificationStatus(
   if (!db) throw new Error("Database is not available");
 
   await db.update(inquiries).set({ notificationStatus }).where(eq(inquiries.id, id));
+}
+
+export async function listInquiries() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  return db.select().from(inquiries).orderBy(desc(inquiries.createdAt), desc(inquiries.id));
+}
+
+export async function getInquiryById(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const records = await db.select().from(inquiries).where(eq(inquiries.id, id)).limit(1);
+  const inquiry = records[0];
+  if (!inquiry) return null;
+  const responses = await db
+    .select()
+    .from(inquiryResponses)
+    .where(eq(inquiryResponses.inquiryId, id))
+    .orderBy(asc(inquiryResponses.createdAt), asc(inquiryResponses.id));
+  return { inquiry, responses };
+}
+
+export async function updateInquiryStatus(id: number, status: "new" | "contacted" | "closed") {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(inquiries).set({ status }).where(eq(inquiries.id, id));
+}
+
+export async function createInquiryResponse(input: InsertInquiryResponse) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(inquiryResponses).values(input).$returningId();
+  const id = result[0]?.id;
+  if (!id) throw new Error("Inquiry response could not be created");
+  return id;
+}
+
+export async function updateInquiryResponseDelivery(input: {
+  id: number;
+  deliveryStatus: "sent" | "failed";
+  providerMessageId?: string | null;
+  errorMessage?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(inquiryResponses).set({
+    deliveryStatus: input.deliveryStatus,
+    providerMessageId: input.providerMessageId ?? null,
+    errorMessage: input.errorMessage ?? null,
+    sentAt: input.deliveryStatus === "sent" ? new Date() : null,
+  }).where(eq(inquiryResponses.id, input.id));
+}
+
+export async function markInquiryResponded(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(inquiries).set({ status: "contacted", lastRespondedAt: new Date() }).where(eq(inquiries.id, id));
 }
 
 export async function countRecentInquiriesByEmail(email: string, since: Date) {

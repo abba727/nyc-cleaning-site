@@ -127,12 +127,32 @@ export const inquiries = mysqlTable("inquiries", {
   notificationStatus: mysqlEnum("notificationStatus", ["pending", "sent", "failed"])
     .default("pending")
     .notNull(),
+  lastRespondedAt: timestamp("lastRespondedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type Inquiry = typeof inquiries.$inferSelect;
 export type InsertInquiry = typeof inquiries.$inferInsert;
+
+export const inquiryResponses = mysqlTable("inquiryResponses", {
+  id: int("id").autoincrement().primaryKey(),
+  inquiryId: int("inquiryId").notNull(),
+  senderUserId: int("senderUserId").notNull(),
+  senderName: varchar("senderName", { length: 200 }).notNull(),
+  senderEmail: varchar("senderEmail", { length: 320 }).notNull(),
+  recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 320 }).notNull(),
+  message: text("message").notNull(),
+  providerMessageId: varchar("providerMessageId", { length: 255 }),
+  deliveryStatus: mysqlEnum("deliveryStatus", ["pending", "sent", "failed"]).default("pending").notNull(),
+  errorMessage: text("errorMessage"),
+  sentAt: timestamp("sentAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InquiryResponse = typeof inquiryResponses.$inferSelect;
+export type InsertInquiryResponse = typeof inquiryResponses.$inferInsert;
 
 export const articles = mysqlTable("articles", {
   id: int("id").autoincrement().primaryKey(),
