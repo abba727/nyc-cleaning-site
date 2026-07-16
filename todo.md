@@ -265,3 +265,13 @@
 - [x] Validate the revised homepage at desktop and mobile sizes, then run Vitest, TypeScript, production build, and current runtime-log checks.
 - [x] Publish the six-tile homepage service-grid update.
 - [x] Push the published update and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Re-read the required image-generation integration guidance and audit the current article cover prompt inputs, server procedure, storage path, and client error mapping.
+- [x] Inspect production and local runtime evidence for the `Unexpected token '<' ... is not valid JSON` Generate Image failure.
+- [x] Reproduce the failure and identify which endpoint or upstream response returns HTML instead of the expected JSON payload.
+- [x] Make the default AI cover prompt derive primarily from the existing Article Body, with title and excerpt used only as supporting context.
+- [x] Keep an optional custom visual-direction field while making clear that it supplements rather than replaces the article-derived subject.
+- [x] Repair the image-generation request path and return a concise, safe editor error instead of exposing raw HTML or JSON parsing details.
+- [x] Add regression coverage for body-derived prompts, optional direction, missing-body guidance, non-JSON upstream responses, CMS authorization, and durable image selection.
+- [x] Validate image generation from an existing article using the real service, then run Vitest, TypeScript, production build, responsive CMS checks, and runtime-log review.
+- [x] Publish the article-based cover-image generation repair.
+- [ ] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.

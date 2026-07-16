@@ -5,9 +5,9 @@ import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPa
 import { ARTICLE_BODY_MAX_GENERATION_LENGTH, ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_TOPIC_MAX_LENGTH, ARTICLE_TOPIC_MIN_LENGTH } from "@shared/articleSeo";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, findArticleUrlConflict, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { generateImage } from "./_core/imageGeneration";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
+import { generateArticleCover } from "./articleCoverGeneration";
 import { generateArticleSeoFields } from "./articleSeoGeneration";
 import { generateArticleFromTopic } from "./articleGeneration";
 import { storagePut } from "./storage";
@@ -486,32 +486,26 @@ export const appRouter = router({
       return result;
     }),
     generateCover: adminProcedure.input(z.object({
-      prompt: z.string().trim().min(10).max(1200),
+      body: z.string().trim()
+        .min(ARTICLE_BODY_MIN_GENERATION_LENGTH, `Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before generating a cover image.`)
+        .max(ARTICLE_BODY_MAX_GENERATION_LENGTH, `Keep the Article Body under ${ARTICLE_BODY_MAX_GENERATION_LENGTH.toLocaleString()} characters before generating a cover image.`),
+      direction: z.string().trim().max(1200).optional(),
       title: z.string().trim().max(512).optional(),
       excerpt: z.string().trim().max(1200).optional(),
     })).mutation(async ({ input }) => {
-      const context = [
-        input.title ? `Article title: ${input.title}.` : "",
-        input.excerpt ? `Article summary: ${input.excerpt}.` : "",
-      ].filter(Boolean).join(" ");
-      const prompt = [
-        "Create a realistic, premium editorial cover photograph for NYC Cleaning and Maintenance, a professional New York City property cleaning company.",
-        context,
-        `Creative direction: ${input.prompt}`,
-        "Use believable New York property details, clean natural lighting, navy and subtle teal visual accents, and a polished commercial photography style.",
-        "Do not include text, logos, watermarks, distorted architecture, unsafe cleaning practices, or exaggerated before-and-after effects.",
-        "Compose the image as a horizontal 3:2 website cover with a clear focal point and enough visual breathing room for responsive cropping.",
-      ].filter(Boolean).join(" ");
-
       try {
-        const result = await generateImage({ prompt });
+        const result = await generateArticleCover(input);
         if (!result.url) throw new Error("The image service returned no image URL.");
         return { url: result.url, key: result.key ?? null } as const;
       } catch (error) {
-        console.error("[Article] AI cover generation failed", error);
+        const detail = error instanceof Error ? error.message : "Unknown image generation error";
+        console.error("[Article] AI cover generation failed", {
+          name: error instanceof Error ? error.name : "UnknownError",
+          detail: detail.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").slice(0, 300),
+        });
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "The image could not be generated. Please adjust the prompt and try again.",
+          message: "The image service could not complete this request. Please try Generate image again in a moment.",
         });
       }
     }),

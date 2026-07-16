@@ -19,6 +19,23 @@ describe("Insight editor workflow", () => {
     expect(source).toContain('updateField("coverImageUrl", generatedImage.url)');
   });
 
+  it("derives generated cover subjects from the Article Body and treats visual direction as optional", () => {
+    expect(source).toContain("The existing Article Body determines the image subject.");
+    expect(source).toContain("Optional direction only refines the look.");
+    expect(source).toContain("Optional: add a camera angle, mood, location detail, or other visual direction.");
+    expect(source).toContain("body,");
+    expect(source).toContain("direction: imagePrompt.trim() || undefined");
+    expect(source).not.toContain("Leave blank to use the title and excerpt.");
+  });
+
+  it("shows body-length guidance and sanitizes invalid HTML or JSON proxy responses", () => {
+    expect(source).toContain("before generating a cover image");
+    expect(source).toContain("coverGenerationErrorMessage");
+    expect(source).toContain("not valid json");
+    expect(source).toContain("temporary invalid response");
+    expect(source).toContain("coverGenerationErrorMessage(generateCover.error.message)");
+  });
+
   it("uses a substantially larger multi-line excerpt editor", () => {
     expect(source).toContain('id="article-excerpt"');
     expect(source).toContain('className="admin-excerpt-input" rows={8}');

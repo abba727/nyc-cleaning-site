@@ -165,6 +165,7 @@ describe("article CMS authorization and contracts", () => {
   });
 
   it("lets a content manager generate a durable AI cover without changing the article automatically", async () => {
+    const body = "A New York apartment lobby porter follows resident traffic, delivery windows, rainy-day floor conditions, entry-glass care, touchpoint cleaning, waste removal, and elevator detailing. ".repeat(2);
     imageGenerationMocks.generateImage.mockResolvedValue({
       key: "generated/nyc-lobby.png",
       url: "/manus-storage/nyc-lobby.png",
@@ -172,9 +173,10 @@ describe("article CMS authorization and contracts", () => {
     const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
 
     const result = await caller.article.generateCover({
+      body,
       title: "How to Keep a Lobby Ready for Residents",
       excerpt: "A practical maintenance plan for high-traffic New York entrances.",
-      prompt: "A realistic building porter maintaining a bright Manhattan apartment lobby",
+      direction: "A wide eye-level view in soft morning light",
     });
 
     expect(result).toEqual({
@@ -182,16 +184,47 @@ describe("article CMS authorization and contracts", () => {
       url: "/manus-storage/nyc-lobby.png",
     });
     expect(imageGenerationMocks.generateImage).toHaveBeenCalledWith({
-      prompt: expect.stringContaining("horizontal 3:2 website cover"),
+      prompt: expect.stringMatching(/Article Body:[\s\S]*New York apartment lobby porter[\s\S]*Optional visual direction from the editor: A wide eye-level view/),
     });
     expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+  });
+
+  it("requires the Article Body under the new cover contract and rejects the retired prompt-only shape", async () => {
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.generateCover({ body: "Too short." })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringContaining("at least 200 characters"),
+    });
+    await expect(caller.article.generateCover({
+      prompt: "A realistic New York apartment lobby prepared for the morning rush",
+    } as never)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(imageGenerationMocks.generateImage).not.toHaveBeenCalled();
+  });
+
+  it("returns a safe recoverable error when the image service responds with HTML", async () => {
+    const body = "A detailed Article Body about high-traffic lobby care, porter schedules, floor safety, entry glass, elevators, waste collection, and resident service standards in a New York apartment property. ".repeat(2);
+    imageGenerationMocks.generateImage.mockRejectedValue(new Error("Unexpected token '<', \"<html>504 Gateway Time-out</html>\" is not valid JSON"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    try {
+      await expect(caller.article.generateCover({ body })).rejects.toMatchObject({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "The image service could not complete this request. Please try Generate image again in a moment.",
+      });
+      expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+      expect(dbMocks.createArticle).not.toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("denies non-CMS users access to AI cover generation", async () => {
     const caller = appRouter.createCaller(context(user({ openId: "not-an-owner", role: "user" })));
 
     await expect(caller.article.generateCover({
-      prompt: "A realistic New York apartment lobby prepared for the morning rush",
+      body: "A sufficiently developed Article Body about a New York apartment lobby, porter schedules, entrance floors, glass, elevators, and resident-facing maintenance standards. ".repeat(2),
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(imageGenerationMocks.generateImage).not.toHaveBeenCalled();
   });

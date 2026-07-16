@@ -85,6 +85,13 @@ function publicationLabel(state: ArticlePublicationState) {
   return state === "scheduled" ? "Scheduled" : state === "published" ? "Published" : "Draft";
 }
 
+export function coverGenerationErrorMessage(message: string) {
+  if (/unexpected token\s*['"]?</i.test(message) || /not valid json/i.test(message) || /<html/i.test(message)) {
+    return "The image service returned a temporary invalid response. Please choose Generate image again in a moment.";
+  }
+  return message || "The image could not be generated. Please try again in a moment.";
+}
+
 export default function ArticleAdmin() {
   const utils = trpc.useUtils();
   const articleQuery = trpc.article.adminList.useQuery(undefined, { retry: false });
@@ -138,7 +145,7 @@ export default function ArticleAdmin() {
       setGeneratedImage(result);
       toast.success("Image generated. Review it before using it as the cover.");
     },
-    onError: error => toast.error(error.message),
+    onError: error => toast.error(coverGenerationErrorMessage(error.message)),
   });
   const generateSeoFields = trpc.article.generateSeoFields.useMutation();
   const generateArticleMutation = trpc.article.generateArticle.useMutation();
@@ -263,12 +270,18 @@ export default function ArticleAdmin() {
   };
 
   const startImageGeneration = () => {
-    const prompt = imagePrompt.trim() || [form.title, form.excerpt].filter(Boolean).join(". ");
-    if (prompt.length < 10) {
-      toast.error("Add a title, excerpt, or a more detailed image prompt first.");
+    const body = form.bodyText.trim();
+    if (body.length < ARTICLE_BODY_MIN_GENERATION_LENGTH) {
+      toast.error(`Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before generating a cover image.`);
       return;
     }
-    generateCover.mutate({ prompt, title: form.title || undefined, excerpt: form.excerpt || undefined });
+    generateCover.reset();
+    generateCover.mutate({
+      body,
+      direction: imagePrompt.trim() || undefined,
+      title: form.title || undefined,
+      excerpt: form.excerpt || undefined,
+    });
   };
 
   const generateFromBody = async (target: GeneratedField) => {
@@ -446,10 +459,10 @@ export default function ArticleAdmin() {
                 <Label htmlFor="article-cover-alt">Image description</Label><Input id="article-cover-alt" value={form.coverImageAlt} onChange={event => updateField("coverImageAlt", event.target.value)} />
                 <div className="admin-ai-image">
                   <Label htmlFor="article-image-prompt">Generate image with AI</Label>
-                  <Textarea id="article-image-prompt" rows={5} value={imagePrompt} onChange={event => setImagePrompt(event.target.value)} placeholder="Describe the property, cleaning activity, camera angle, mood, and people you want to show. Leave blank to use the title and excerpt." />
+                  <Textarea id="article-image-prompt" rows={5} value={imagePrompt} onChange={event => setImagePrompt(event.target.value)} placeholder="Optional: add a camera angle, mood, location detail, or other visual direction. The article body always determines the main subject." />
                   <Button type="button" variant="outline" onClick={startImageGeneration} disabled={generateCover.isPending}><Sparkles />{generateCover.isPending ? "Generating…" : generatedImage ? "Regenerate image" : "Generate image"}</Button>
-                  <small>Generation may take a moment. The result is saved securely, but it will not replace the cover until you approve it.</small>
-                  {generateCover.error ? <p className="admin-inline-error" role="alert">{generateCover.error.message}</p> : null}
+                  <small>The existing Article Body determines the image subject. Optional direction only refines the look. The result will not replace the cover until you approve it.</small>
+                  {generateCover.error ? <p className="admin-inline-error" role="alert">{coverGenerationErrorMessage(generateCover.error.message)}</p> : null}
                 </div>
               </div>
             </div>
