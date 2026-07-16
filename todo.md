@@ -274,4 +274,4 @@
 - [x] Add regression coverage for body-derived prompts, optional direction, missing-body guidance, non-JSON upstream responses, CMS authorization, and durable image selection.
 - [x] Validate image generation from an existing article using the real service, then run Vitest, TypeScript, production build, responsive CMS checks, and runtime-log review.
 - [x] Publish the article-based cover-image generation repair.
-- [ ] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
