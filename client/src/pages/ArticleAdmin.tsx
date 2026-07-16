@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
-import { ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_SEO_LIMITS } from "@shared/articleSeo";
+import { ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_GENERATED_WORDS, ARTICLE_SEO_LIMITS, ARTICLE_TOPIC_MAX_LENGTH, ARTICLE_TOPIC_MIN_LENGTH } from "@shared/articleSeo";
 import { getArticlePublicationState, type ArticlePublicationState } from "@shared/articleScheduling";
 import { canonicalInsightPath, INSIGHT_CANONICAL_ROOT, normalizeArticleSlug } from "@shared/articleUrls";
 import { Check, Eye, FilePlus2, ImageUp, Pencil, Search, Sparkles, Trash2 } from "lucide-react";
@@ -13,10 +13,10 @@ import { toast } from "sonner";
 
 type EditorStatus = "draft" | "published";
 type EditorFilterStatus = "all" | ArticlePublicationState;
-type GeneratedField = "all" | "excerpt" | "seoTitle" | "metaDescription";
+type GeneratedField = "excerpt" | "seoTitle" | "metaDescription";
+type GenerationTarget = "article" | GeneratedField;
 
 const GENERATED_FIELD_LABELS: Record<GeneratedField, string> = {
-  all: "supporting fields",
   excerpt: "excerpt",
   seoTitle: "SEO title",
   metaDescription: "meta description",
@@ -96,8 +96,8 @@ export default function ArticleAdmin() {
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImage, setGeneratedImage] = useState<{ url: string; key: string | null } | null>(null);
   const [urlOverrides, setUrlOverrides] = useState({ slug: false, path: false });
-  const [generatingField, setGeneratingField] = useState<GeneratedField | null>(null);
-  const [generationErrors, setGenerationErrors] = useState<Partial<Record<GeneratedField, string>>>({});
+  const [generatingField, setGeneratingField] = useState<GenerationTarget | null>(null);
+  const [generationErrors, setGenerationErrors] = useState<Partial<Record<GenerationTarget, string>>>({});
   const perPage = 12;
 
   const createArticle = trpc.article.create.useMutation({
@@ -141,6 +141,7 @@ export default function ArticleAdmin() {
     onError: error => toast.error(error.message),
   });
   const generateSeoFields = trpc.article.generateSeoFields.useMutation();
+  const generateArticleMutation = trpc.article.generateArticle.useMutation();
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -286,15 +287,52 @@ export default function ArticleAdmin() {
       const result = await generateSeoFields.mutateAsync({ body });
       setForm(current => ({
         ...current,
-        ...(target === "all" || target === "excerpt" ? { excerpt: result.excerpt } : {}),
-        ...(target === "all" || target === "seoTitle" ? { seoTitle: result.seoTitle } : {}),
-        ...(target === "all" || target === "metaDescription" ? { metaDescription: result.metaDescription } : {}),
+        ...(target === "excerpt" ? { excerpt: result.excerpt } : {}),
+        ...(target === "seoTitle" ? { seoTitle: result.seoTitle } : {}),
+        ...(target === "metaDescription" ? { metaDescription: result.metaDescription } : {}),
       }));
-      toast.success(target === "all" ? "Excerpt and search fields generated. Review and edit them before saving." : `${GENERATED_FIELD_LABELS[target][0].toUpperCase()}${GENERATED_FIELD_LABELS[target].slice(1)} generated. Review and edit it before saving.`);
+      toast.success(`${GENERATED_FIELD_LABELS[target][0].toUpperCase()}${GENERATED_FIELD_LABELS[target].slice(1)} generated. Review and edit it before saving.`);
     } catch (error) {
       setGenerationErrors(current => ({
         ...current,
         [target]: error instanceof Error ? error.message : "The text could not be generated. Please try again.",
+      }));
+    } finally {
+      setGeneratingField(null);
+    }
+  };
+
+  const generateArticleFromTopic = async () => {
+    const topic = form.bodyText.trim();
+    setGenerationErrors(current => ({ ...current, article: undefined }));
+    if (topic.length < ARTICLE_TOPIC_MIN_LENGTH) {
+      setGenerationErrors(current => ({
+        ...current,
+        article: `Write at least ${ARTICLE_TOPIC_MIN_LENGTH} characters describing the article topic.`,
+      }));
+      return;
+    }
+    if (topic.length > ARTICLE_TOPIC_MAX_LENGTH) {
+      setGenerationErrors(current => ({
+        ...current,
+        article: `Keep the topic or brief under ${ARTICLE_TOPIC_MAX_LENGTH.toLocaleString()} characters.`,
+      }));
+      return;
+    }
+
+    const existingWordCount = topic.split(/\s+/).filter(Boolean).length;
+    const looksLikeDraft = existingWordCount >= 40 || /^##\s+/m.test(topic);
+    if (looksLikeDraft && !window.confirm("Generate Article will replace the current Article Body. Continue?")) return;
+
+    setGeneratingField("article");
+    try {
+      const result = await generateArticleMutation.mutateAsync({ topic });
+      setForm(current => ({ ...current, bodyText: result.article }));
+      toast.success(`Article generated at approximately ${result.wordCount} words. Review and edit it before saving.`);
+    } catch (error) {
+      setGenerationErrors(current => ({
+        ...current,
+        article: error instanceof Error ? error.message : "The article could not be generated. Refine the topic and try again.",
       }));
     } finally {
       setGeneratingField(null);
@@ -313,7 +351,7 @@ export default function ArticleAdmin() {
           aria-label={`Generate ${GENERATED_FIELD_LABELS[target]} from Article Body`}
         >
           {generatingField === target ? <Spinner className="size-3.5" /> : <Sparkles aria-hidden="true" />}
-          {generatingField === target ? "Generating…" : target === "all" ? "Generate all" : "Generate"}
+          {generatingField === target ? "Generating…" : "Generate"}
         </button>
       </div>
       {generationErrors[target] ? <p className="admin-inline-error" role="alert">{generationErrors[target]}</p> : null}
@@ -378,8 +416,19 @@ export default function ArticleAdmin() {
           <div className="admin-form-grid">
             <div className="admin-field admin-field-wide"><Label htmlFor="article-title">Title</Label><Input id="article-title" value={form.title} onChange={event => updateTitle(event.target.value)} /></div>
             <div className="admin-field"><Label htmlFor="article-slug">Slug</Label><Input id="article-slug" value={form.slug} onChange={event => updateSlug(event.target.value)} placeholder="generated-from-the-title" /><small>{form.id || urlOverrides.slug ? "Custom slug preserved. Edit only when you intentionally want a different URL." : "Generated automatically from the title."}</small></div>
-            <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateCanonicalPath(event.target.value)} placeholder="/insights/generated-from-the-title/" /><small>{form.id || urlOverrides.path ? "Custom canonical path preserved." : "Generated automatically as /insights/{slug}/."}</small></div>
-            <div className="admin-field admin-field-wide"><Label htmlFor="article-body">Article Body</Label><Textarea id="article-body" className="admin-body-input" rows={16} value={form.bodyText} onChange={event => updateField("bodyText", event.target.value)} placeholder="Write the full article first. Use ## for section headings, ### for subheadings, and - for list items." />{generateControl("all", <>Formatting: <strong>## Heading</strong>, <strong>### Subheading</strong>, <strong>- List item</strong>. Generate all fills the three editable fields below.</>)}</div>
+            <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateCanonicalPath(event.target.value)} placeholder="/generated-from-the-title/" /><small>{form.id || urlOverrides.path ? "Custom canonical path preserved." : "Generated automatically as /{slug}/ to match existing Insights."}</small></div>
+            <div className="admin-field admin-field-wide">
+              <Label htmlFor="article-body">Article Body</Label>
+              <Textarea id="article-body" className="admin-body-input" rows={18} value={form.bodyText} onChange={event => updateField("bodyText", event.target.value)} placeholder="Enter a topic or short brief, then choose Generate Article. You can also write manually using ## for headings, ### for subheadings, and - for list items." />
+              <div className="admin-field-footer">
+                <small>Enter a topic or brief to create an approximately {ARTICLE_GENERATED_WORDS.target}-word article with headings. Generated text remains fully editable.</small>
+                <button type="button" className="admin-generate-link" onClick={() => void generateArticleFromTopic()} disabled={generatingField !== null} aria-label="Generate article from the topic entered in Article Body">
+                  {generatingField === "article" ? <Spinner className="size-3.5" /> : <Sparkles aria-hidden="true" />}
+                  {generatingField === "article" ? "Generating…" : "Generate Article"}
+                </button>
+              </div>
+              {generationErrors.article ? <p className="admin-inline-error" role="alert">{generationErrors.article}</p> : null}
+            </div>
             <div className="admin-field admin-field-wide"><Label htmlFor="article-excerpt">Excerpt</Label><Textarea id="article-excerpt" className="admin-excerpt-input" rows={8} value={form.excerpt} onChange={event => updateField("excerpt", event.target.value)} placeholder="Generate a summary from the Article Body, or write your own." />{generateControl("excerpt", `Generated excerpts use up to ${ARTICLE_SEO_LIMITS.excerpt} characters and remain fully editable.`)}</div>
             <div className="admin-field"><Label htmlFor="article-author">Author</Label><Input id="article-author" value={form.authorName} onChange={event => updateField("authorName", event.target.value)} /></div>
             <div className="admin-field"><Label htmlFor="article-status">Publishing</Label><select id="article-status" value={form.status} onChange={event => updateStatus(event.target.value as EditorStatus)}><option value="draft">Keep as draft</option><option value="published">Publish or schedule</option></select><small>Current state: <strong>{publicationLabel(currentPublicationState)}</strong></small></div>

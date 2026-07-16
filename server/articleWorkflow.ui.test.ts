@@ -36,8 +36,10 @@ describe("Insight editor workflow", () => {
     expect(seoTitleIndex).toBeLessThan(metaDescriptionIndex);
   });
 
-  it("offers explicit per-field Generate links with independent loading and error states", () => {
-    expect(source).toContain('generateControl("all"');
+  it("offers Generate Article plus explicit supporting-field links with independent loading and error states", () => {
+    expect(source).toContain('"Generate Article"');
+    expect(source).toContain("generateArticleFromTopic");
+    expect(source).toContain("generationErrors.article");
     expect(source).toContain('generateControl("excerpt"');
     expect(source).toContain('generateControl("seoTitle"');
     expect(source).toContain('generateControl("metaDescription"');
@@ -52,9 +54,12 @@ describe("Insight editor workflow", () => {
 
     expect(generatorIndex).toBeGreaterThan(-1);
     expect(clickIndex).toBeGreaterThan(generatorIndex);
-    expect(source).toContain('target === "all" || target === "excerpt" ? { excerpt: result.excerpt }');
-    expect(source).toContain('target === "all" || target === "seoTitle" ? { seoTitle: result.seoTitle }');
-    expect(source).toContain('target === "all" || target === "metaDescription" ? { metaDescription: result.metaDescription }');
+    expect(source).toContain('target === "excerpt" ? { excerpt: result.excerpt }');
+    expect(source).toContain('target === "seoTitle" ? { seoTitle: result.seoTitle }');
+    expect(source).toContain('target === "metaDescription" ? { metaDescription: result.metaDescription }');
+    expect(source).toContain('bodyText: result.article');
+    expect(source).toContain('window.confirm("Generate Article will replace the current Article Body. Continue?")');
+    expect(source).toContain('onChange={event => updateField("bodyText", event.target.value)}');
     expect(source).toContain('onChange={event => updateField("excerpt", event.target.value)}');
     expect(source).toContain('onChange={event => updateField("seoTitle", event.target.value)}');
     expect(source).toContain('onChange={event => updateField("metaDescription", event.target.value)}');
@@ -74,12 +79,18 @@ describe("Insight editor workflow", () => {
     expect(styles).toContain(".admin-field-footer { align-items: flex-end; flex-direction: column;");
   });
 
+  it("makes the Article Body taller while retaining a smaller mobile minimum", () => {
+    expect(source).toContain('className="admin-body-input" rows={18}');
+    expect(styles).toContain(".admin-body-input { min-height: 27rem;");
+    expect(styles).toContain(".admin-body-input { min-height: 22rem; }");
+  });
+
   it("generates new Insight URLs from the title while preserving intentional overrides", () => {
     expect(source).toContain("normalizeArticleSlug(title)");
     expect(source).toContain("canonicalInsightPath(slug)");
     expect(source).toContain('setUrlOverrides(current => ({ ...current, slug: true }))');
     expect(source).toContain('setUrlOverrides(current => ({ ...current, path: true }))');
     expect(source).toContain('setUrlOverrides({ slug: true, path: true })');
-    expect(source).toContain("Generated automatically as /insights/{slug}/.");
+    expect(source).toContain("Generated automatically as /{slug}/ to match existing Insights.");
   });
 });

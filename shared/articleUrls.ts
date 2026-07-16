@@ -1,4 +1,4 @@
-export const INSIGHT_CANONICAL_ROOT = "/insights/";
+export const INSIGHT_CANONICAL_ROOT = "/";
 
 export function normalizeArticleSlug(value: string) {
   return value

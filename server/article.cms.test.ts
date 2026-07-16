@@ -17,11 +17,13 @@ const dbMocks = vi.hoisted(() => ({
 const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
 const imageGenerationMocks = vi.hoisted(() => ({ generateImage: vi.fn() }));
 const seoGenerationMocks = vi.hoisted(() => ({ generateArticleSeoFields: vi.fn() }));
+const articleGenerationMocks = vi.hoisted(() => ({ generateArticleFromTopic: vi.fn() }));
 
 vi.mock("./db", () => dbMocks);
 vi.mock("./storage", () => storageMocks);
 vi.mock("./_core/imageGeneration", () => imageGenerationMocks);
 vi.mock("./articleSeoGeneration", () => seoGenerationMocks);
+vi.mock("./articleGeneration", () => articleGenerationMocks);
 vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn() }));
 
 import { appRouter } from "./routers";
@@ -230,5 +232,36 @@ describe("article CMS authorization and contracts", () => {
       body: "A sufficiently long article body that an ordinary user must not be allowed to submit for CMS generation. ".repeat(4),
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(seoGenerationMocks.generateArticleSeoFields).not.toHaveBeenCalled();
+  });
+
+  it("lets a content manager generate an editable article from an Article Body topic without saving it", async () => {
+    articleGenerationMocks.generateArticleFromTopic.mockResolvedValue({
+      article: "A practical introduction.\n\n## Plan the work\n\nUseful details.\n\n## Review the routine\n\nA concise conclusion.",
+      wordCount: 198,
+    });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.generateArticle({
+      topic: "How to plan reliable common-area cleaning in an NYC building",
+    })).resolves.toMatchObject({ wordCount: 198 });
+    expect(articleGenerationMocks.generateArticleFromTopic).toHaveBeenCalledWith(
+      "How to plan reliable common-area cleaning in an NYC building",
+    );
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+    expect(dbMocks.createArticle).not.toHaveBeenCalled();
+  });
+
+  it("validates topic length and denies non-CMS users access to article generation", async () => {
+    const editor = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+    await expect(editor.article.generateArticle({ topic: "Short" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringContaining("at least 10 characters"),
+    });
+
+    const ordinaryUser = appRouter.createCaller(context(user({ openId: "not-an-owner", role: "user" })));
+    await expect(ordinaryUser.article.generateArticle({
+      topic: "How to plan reliable common-area cleaning in an NYC building",
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(articleGenerationMocks.generateArticleFromTopic).not.toHaveBeenCalled();
   });
 });

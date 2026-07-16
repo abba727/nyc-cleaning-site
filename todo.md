@@ -233,3 +233,14 @@
 - [x] Validate the generation workflow, responsive editor, Vitest, TypeScript, production build, and runtime logs.
 - [x] Publish the body-first SEO generation workflow.
 - [x] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Re-read the required full-stack LLM guidance for authenticated article generation and structured output.
+- [x] Audit existing published Insight canonical paths, legacy route aliases, and the current new-article path generator to determine the correct convention.
+- [x] Increase the Article Body editor height on desktop and mobile without obscuring the field when the on-screen keyboard opens.
+- [x] Replace the Article Body “Generate all” action with “Generate Article.”
+- [x] Generate an approximately 200-word, factually cautious article from the topic or brief entered in Article Body, using appropriate Markdown headings and readable paragraphs.
+- [x] Preserve explicit-click behavior and editable output, with clear minimum-topic, loading, generation-error, and replacement-confirmation states.
+- [x] Decide and implement the canonical-path convention that matches existing public Insights while preserving established URLs and manual overrides.
+- [x] Add regression coverage for article generation, word-count range, heading structure, editor height, click-only replacement, and canonical-path behavior.
+- [x] Validate the complete workflow responsively with Vitest, TypeScript, production build, and runtime-log review.
+- [x] Publish the article-generation and canonical-path alignment release.
+- [ ] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.

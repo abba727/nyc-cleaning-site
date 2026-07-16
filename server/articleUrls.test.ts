@@ -7,7 +7,8 @@ describe("Insight URL generation", () => {
   });
 
   it("builds the canonical Insight path from the normalized slug", () => {
-    expect(canonicalInsightPath("A Better Lobby Plan")).toBe("/insights/a-better-lobby-plan/");
+    expect(canonicalInsightPath("A Better Lobby Plan")).toBe("/a-better-lobby-plan/");
+    expect(INSIGHT_CANONICAL_ROOT).toBe("/");
     expect(canonicalInsightPath("")).toBe(INSIGHT_CANONICAL_ROOT);
   });
 

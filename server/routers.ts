@@ -2,13 +2,14 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
-import { ARTICLE_BODY_MAX_GENERATION_LENGTH, ARTICLE_BODY_MIN_GENERATION_LENGTH } from "@shared/articleSeo";
+import { ARTICLE_BODY_MAX_GENERATION_LENGTH, ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_TOPIC_MAX_LENGTH, ARTICLE_TOPIC_MIN_LENGTH } from "@shared/articleSeo";
 import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, findArticleUrlConflict, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { generateImage } from "./_core/imageGeneration";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { generateArticleSeoFields } from "./articleSeoGeneration";
+import { generateArticleFromTopic } from "./articleGeneration";
 import { storagePut } from "./storage";
 import {
   createCmsSessionToken,
@@ -526,6 +527,21 @@ export const appRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "The text could not be generated. Review the Article Body and try again.",
+        });
+      }
+    }),
+    generateArticle: adminProcedure.input(z.object({
+      topic: z.string().trim()
+        .min(ARTICLE_TOPIC_MIN_LENGTH, `Write at least ${ARTICLE_TOPIC_MIN_LENGTH} characters describing the article topic.`)
+        .max(ARTICLE_TOPIC_MAX_LENGTH, `Keep the topic or brief under ${ARTICLE_TOPIC_MAX_LENGTH.toLocaleString()} characters.`),
+    })).mutation(async ({ input }) => {
+      try {
+        return await generateArticleFromTopic(input.topic);
+      } catch (error) {
+        console.error("[Article] AI article generation failed", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "The article could not be generated. Refine the topic and try again.",
         });
       }
     }),
