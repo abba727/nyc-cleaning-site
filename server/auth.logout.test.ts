@@ -1,7 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import { COOKIE_NAME } from "../shared/const";
 import type { TrpcContext } from "./_core/context";
+
+const authDbMocks = vi.hoisted(() => ({ revokeCmsUserSessions: vi.fn() }));
+
+vi.mock("./cmsDb", async importOriginal => {
+  const actual = await importOriginal<typeof import("./cmsDb")>();
+  return { ...actual, revokeCmsUserSessions: authDbMocks.revokeCmsUserSessions };
+});
 
 type CookieCall = {
   name: string;
@@ -18,11 +25,9 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
     openId: "sample-user",
     email: "sample@example.com",
     name: "Sample User",
-    loginMethod: "manus",
-    role: "user",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastSignedIn: new Date(),
+    role: "admin",
+    isPrimaryAdmin: true,
+    sessionVersion: 4,
   };
 
   const ctx: TrpcContext = {
@@ -42,6 +47,11 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
 }
 
 describe("auth.logout", () => {
+  beforeEach(() => {
+    authDbMocks.revokeCmsUserSessions.mockReset();
+    authDbMocks.revokeCmsUserSessions.mockResolvedValue(undefined);
+  });
+
   it("clears the session cookie and reports success", async () => {
     const { ctx, clearedCookies } = createAuthContext();
     const caller = appRouter.createCaller(ctx);
@@ -58,5 +68,6 @@ describe("auth.logout", () => {
       httpOnly: true,
       path: "/",
     });
+    expect(authDbMocks.revokeCmsUserSessions).toHaveBeenCalledWith(1);
   });
 });

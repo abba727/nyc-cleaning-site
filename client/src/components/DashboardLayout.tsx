@@ -116,6 +116,17 @@ function DashboardLayoutContent({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeMenuItem = menuItems.find(item => location === item.path || (item.path !== "/" && location.startsWith(item.path)));
   const isMobile = useIsMobile();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  async function handleLogout() {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      window.location.replace("/admin?session=signed-out");
+    }
+  }
 
   useEffect(() => {
     if (isCollapsed) {
@@ -227,11 +238,12 @@ function DashboardLayoutContent({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
-                  onClick={() => void logout()}
+                  onSelect={() => void handleLogout()}
+                  disabled={isSigningOut}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>{isSigningOut ? "Signing out…" : "Sign out"}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

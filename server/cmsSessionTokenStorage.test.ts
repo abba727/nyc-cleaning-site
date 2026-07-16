@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   clearCmsSessionToken,
   CMS_SESSION_TOKEN_KEY,
+  getCmsSessionExpiration,
   readCmsSessionToken,
   storeCmsSessionToken,
 } from "../client/src/lib/cmsSessionToken";
@@ -48,5 +49,11 @@ describe("CMS bearer session storage", () => {
 
     expect(session.removeItem).toHaveBeenCalledWith(CMS_SESSION_TOKEN_KEY);
     expect(local.removeItem).toHaveBeenCalledWith(CMS_SESSION_TOKEN_KEY);
+  });
+
+  it("reads the expiration timestamp from a signed JWT payload and rejects malformed tokens", () => {
+    const payload = Buffer.from(JSON.stringify({ exp: 1_900_000_000 })).toString("base64url");
+    expect(getCmsSessionExpiration(`header.${payload}.signature`)).toBe(1_900_000_000_000);
+    expect(getCmsSessionExpiration("not-a-jwt")).toBeNull();
   });
 });

@@ -5,8 +5,9 @@ import { isCmsPasswordStrong } from "@shared/cmsPassword";
 import { ENV } from "./_core/env";
 
 export const CMS_SESSION_KIND = "nyc-cleaning-cms";
-export const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
-export const REMEMBER_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+export const CMS_SESSION_MS = 3 * 60 * 60 * 1000;
+export const SHORT_SESSION_MS = CMS_SESSION_MS;
+export const REMEMBER_SESSION_MS = CMS_SESSION_MS;
 export const VERIFICATION_CODE_TTL_MS = 10 * 60 * 1000;
 export const INVITATION_TTL_MS = VERIFICATION_CODE_TTL_MS;
 export const RESET_TTL_MS = VERIFICATION_CODE_TTL_MS;
@@ -88,9 +89,8 @@ export async function verifyPassword(passwordHash: string, password: string) {
 
 export async function createCmsSessionToken(
   claims: CmsSessionClaims,
-  rememberMe: boolean,
+  _rememberMe: boolean,
 ) {
-  const expiresInMs = rememberMe ? REMEMBER_SESSION_MS : SHORT_SESSION_MS;
   const now = Date.now();
   return new SignJWT({
     kind: CMS_SESSION_KIND,
@@ -99,7 +99,7 @@ export async function createCmsSessionToken(
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(String(claims.userId))
     .setIssuedAt(Math.floor(now / 1000))
-    .setExpirationTime(Math.floor((now + expiresInMs) / 1000))
+    .setExpirationTime(Math.floor((now + CMS_SESSION_MS) / 1000))
     .sign(sessionSecret());
 }
 

@@ -27,6 +27,7 @@ import {
   listCmsUsersAndInvitations,
   recordLoginResult,
   removeCmsUser,
+  revokeCmsUserSessions,
   revokeInvitation,
 } from "./cmsDb";
 import { sendInquiryNotification, sendInquiryReply, sendInvitationEmail, sendPasswordResetEmail, sendPrimaryAdminSetupEmail } from "./cmsEmail";
@@ -251,9 +252,16 @@ export const appRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "We couldn't verify that code. Request a new code and use only the most recent email; codes expire after 10 minutes." });
       }
     }),
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      if (ctx.user) {
+        try {
+          await revokeCmsUserSessions(ctx.user.id);
+        } catch (error) {
+          console.error("[CMS Auth] Could not revoke the signed-out session version", error);
+        }
+      }
       return {
         success: true,
       } as const;

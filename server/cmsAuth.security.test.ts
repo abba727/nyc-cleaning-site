@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  CMS_SESSION_MS,
   createCmsSessionToken,
   createOpaqueToken,
   generateVerificationCode,
@@ -75,5 +76,26 @@ describe("CMS authentication primitives", () => {
     const token = await createCmsSessionToken({ userId: 42, sessionVersion: 7 }, false);
     await expect(verifyCmsSessionToken(token)).resolves.toMatchObject({ userId: 42, sessionVersion: 7 });
     await expect(verifyCmsSessionToken(`${token}tampered`)).resolves.toBeNull();
+  });
+
+  it("expires every CMS session after three hours, including remembered sessions", async () => {
+    const startedAt = new Date("2026-07-16T12:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(startedAt);
+    try {
+      expect(CMS_SESSION_MS).toBe(3 * 60 * 60 * 1000);
+      const shortToken = await createCmsSessionToken({ userId: 7, sessionVersion: 2 }, false);
+      const rememberedToken = await createCmsSessionToken({ userId: 7, sessionVersion: 2 }, true);
+
+      vi.setSystemTime(new Date(startedAt.getTime() + CMS_SESSION_MS - 1_000));
+      await expect(verifyCmsSessionToken(shortToken)).resolves.toMatchObject({ userId: 7 });
+      await expect(verifyCmsSessionToken(rememberedToken)).resolves.toMatchObject({ userId: 7 });
+
+      vi.setSystemTime(new Date(startedAt.getTime() + CMS_SESSION_MS + 1_000));
+      await expect(verifyCmsSessionToken(shortToken)).resolves.toBeNull();
+      await expect(verifyCmsSessionToken(rememberedToken)).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

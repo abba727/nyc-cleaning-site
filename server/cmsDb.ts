@@ -96,6 +96,14 @@ export async function recordLoginResult(input: { userId?: number; email: string;
   });
 }
 
+export async function revokeCmsUserSessions(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.update(cmsCredentials)
+    .set({ sessionVersion: sql`${cmsCredentials.sessionVersion} + 1` })
+    .where(eq(cmsCredentials.userId, userId));
+}
+
 export async function createInvitation(input: { email: string; role: CmsRole; actorUserId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");

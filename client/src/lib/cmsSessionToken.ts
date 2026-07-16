@@ -23,3 +23,18 @@ export function clearCmsSessionToken(sessionStorage: TokenStorage, localStorage:
   sessionStorage.removeItem(CMS_SESSION_TOKEN_KEY);
   localStorage.removeItem(CMS_SESSION_TOKEN_KEY);
 }
+
+export function getCmsSessionExpiration(token: string) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const decoded = JSON.parse(atob(padded)) as { exp?: unknown };
+    return typeof decoded.exp === "number" && Number.isFinite(decoded.exp)
+      ? decoded.exp * 1000
+      : null;
+  } catch {
+    return null;
+  }
+}

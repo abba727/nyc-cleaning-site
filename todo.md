@@ -188,3 +188,11 @@
 - [x] Add regression tests proving Resend is the sole notification path and every quote notification targets info@fcmre.com.
 - [x] Run the full Vitest suite, TypeScript checks, production build, and runtime-log review for the corrected email workflow.
 - [x] Publish the Resend-only inquiry delivery correction and confirm the live workflow no longer sends Manus-branded notifications.
+- [x] Trace the CMS logout button, mutation, cookie-clearing options, cached user state, and post-logout navigation to identify why clicking Logout appears to do nothing.
+- [x] Make Logout reliably clear the server session and local CMS authentication state, then redirect immediately to `/admin/login/`.
+- [x] Enforce a three-hour CMS session lifetime on both server-issued tokens and browser cookies, including remembered sessions.
+- [x] Automatically return expired CMS sessions to the login screen with a clear “session expired” message while avoiding redirect loops.
+- [x] Add regression tests for logout cookie clearing, three-hour token expiration, UI logout behavior, and expired-session messaging.
+- [x] Validate desktop/mobile administrator behavior, run Vitest, TypeScript, production build, and review authentication runtime logs.
+- [x] Publish the corrected logout and administrator session-timeout workflow.
+- [ ] Verify the selected `abba727/nyc-cleaning-site` repository, preserve its history, commit all completed project code, and push the validated release to GitHub.

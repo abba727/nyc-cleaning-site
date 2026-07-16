@@ -16,6 +16,7 @@ export default function AdminLogin() {
   const [rememberMe, setRememberMe] = useState(false);
   const [rememberEmail, setRememberEmail] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const rememberedEmail = readRememberedCmsEmail(window.localStorage);
@@ -23,11 +24,19 @@ export default function AdminLogin() {
       setEmail(rememberedEmail);
       setRememberEmail(true);
     }
+    const sessionState = new URLSearchParams(window.location.search).get("session");
+    if (sessionState === "expired") {
+      setSessionError("Your 3-hour session expired. Please sign in again.");
+    } else if (sessionState === "signed-out") {
+      setSessionNotice("You have been signed out securely.");
+    }
+    if (sessionState) window.history.replaceState({}, "", "/admin");
   }, []);
 
   const login = trpc.auth.login.useMutation({
     onSuccess: async result => {
       setSessionError(null);
+      setSessionNotice(null);
       storeCmsSessionToken(window.sessionStorage, window.localStorage, result.token, result.rememberMe);
       try {
         await utils.auth.me.invalidate();
@@ -48,6 +57,7 @@ export default function AdminLogin() {
   function submit(event: FormEvent) {
     event.preventDefault();
     setSessionError(null);
+    setSessionNotice(null);
     const normalizedEmail = normalizeCmsEmail(email);
     updateRememberedCmsEmail(window.localStorage, normalizedEmail, rememberEmail);
     setEmail(normalizedEmail);
@@ -71,7 +81,7 @@ export default function AdminLogin() {
         <div className="space-y-3">
           <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600" htmlFor="remember-session">
             <Checkbox id="remember-session" checked={rememberMe} onCheckedChange={value => setRememberMe(value === true)} />
-            Keep me signed in for 30 days
+            Keep me signed in if I close this browser (up to 3 hours)
           </label>
           <label className="flex cursor-pointer items-center gap-3 text-sm text-slate-600" htmlFor="remember-email">
             <Checkbox
@@ -87,6 +97,7 @@ export default function AdminLogin() {
           </label>
           <p className="pl-7 text-xs leading-5 text-slate-500">Your password is never stored.</p>
         </div>
+        {sessionNotice ? <p role="status" aria-live="polite" className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{sessionNotice}</p> : null}
         {login.error || sessionError ? <p role="alert" aria-live="assertive" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{sessionError ?? login.error?.message}</p> : null}
         <Button type="submit" aria-busy={login.isPending} className="h-11 w-full bg-[#14846f] text-white hover:bg-[#106c5c]" disabled={login.isPending}>
           {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />}
