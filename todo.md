@@ -202,4 +202,4 @@
 - [x] Add an end-to-end regression proving login establishes an authenticated CMS session, protected pages load, timeout handling works, and logout revokes the same session.
 - [x] Validate the repaired production-equivalent login flow, all Vitest suites, TypeScript, production build, responsive login UI, and authentication logs.
 - [x] Publish the urgent CMS login-session repair and verify the live administrator route accepts a valid issued session.
-- [ ] Push the repaired release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the repaired release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
