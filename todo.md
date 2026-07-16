@@ -258,3 +258,10 @@
 - [x] Validate the exact reported topic against the real generation service, then run Vitest, TypeScript, production build, responsive CMS checks, and current runtime-log review.
 - [x] Publish the urgent Generate Article repair.
 - [x] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Audit the current homepage service-card source, available service routes, and production image assignments to select two complementary additions.
+- [x] Expand the homepage service grid from four to six cards using existing services, valid internal links, descriptive alt text, and production-ready images.
+- [x] Preserve an even three-column desktop layout and balanced two-column/single-column responsive behavior without changing existing service URLs.
+- [x] Add regression coverage for the six-card count, unique destinations, valid image assignments, and responsive grid behavior.
+- [x] Validate the revised homepage at desktop and mobile sizes, then run Vitest, TypeScript, production build, and current runtime-log checks.
+- [x] Publish the six-tile homepage service-grid update.
+- [ ] Push the published update and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.

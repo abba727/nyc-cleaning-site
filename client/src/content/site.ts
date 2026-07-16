@@ -85,6 +85,8 @@ export const featuredServices = featuredServicePaths
   .map(path => services.find(service => service.path === path))
   .filter((service): service is SitePage => Boolean(service));
 
+export const homepageServices = featuredServices.slice(0, 6);
+
 export const serviceGroups = [
   { label: "Cleaning", paths: featuredServicePaths.slice(0, 4) },
   { label: "Building care", paths: featuredServicePaths.slice(4, 8) },
