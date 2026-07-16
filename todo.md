@@ -195,4 +195,4 @@
 - [x] Add regression tests for logout cookie clearing, three-hour token expiration, UI logout behavior, and expired-session messaging.
 - [x] Validate desktop/mobile administrator behavior, run Vitest, TypeScript, production build, and review authentication runtime logs.
 - [x] Publish the corrected logout and administrator session-timeout workflow.
-- [ ] Verify the selected `abba727/nyc-cleaning-site` repository, preserve its history, commit all completed project code, and push the validated release to GitHub.
+- [x] Verify the selected `abba727/nyc-cleaning-site` repository, preserve its history, commit all completed project code, and push the validated release to GitHub.
