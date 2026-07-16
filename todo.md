@@ -213,4 +213,4 @@
 - [x] Confirm the existing `publishedAt` field requires no schema migration and add regression coverage for scheduled visibility, CMS permissions, image-generation persistence, and editor behavior.
 - [x] Validate scheduling, generated-image selection, responsive CMS UI, Vitest, TypeScript, production build, and runtime logs.
 - [x] Publish the completed Insight scheduling and AI image workflow.
-- [ ] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
