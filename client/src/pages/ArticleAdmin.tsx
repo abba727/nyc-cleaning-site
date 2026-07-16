@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { getArticlePublicationState, type ArticlePublicationState } from "@shared/articleScheduling";
+import { canonicalInsightPath, INSIGHT_CANONICAL_ROOT, normalizeArticleSlug } from "@shared/articleUrls";
 import { Check, Eye, FilePlus2, ImageUp, Pencil, Search, Sparkles, Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -30,7 +31,7 @@ type ArticleFormState = {
 };
 
 const EMPTY_FORM: ArticleFormState = {
-  path: "/blog/",
+  path: INSIGHT_CANONICAL_ROOT,
   slug: "",
   title: "",
   excerpt: "",
@@ -45,10 +46,6 @@ const EMPTY_FORM: ArticleFormState = {
   status: "draft",
   publishedAt: null,
 };
-
-function makeSlug(value: string) {
-  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-}
 
 function blocksToText(blocks: Array<{ type: "h2" | "h3" | "p" | "li"; text: string }> | null | undefined) {
   return (blocks ?? []).map(block => {
@@ -88,6 +85,7 @@ export default function ArticleAdmin() {
   const [showPreview, setShowPreview] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImage, setGeneratedImage] = useState<{ url: string; key: string | null } | null>(null);
+  const [urlOverrides, setUrlOverrides] = useState({ slug: false, path: false });
   const perPage = 12;
 
   const createArticle = trpc.article.create.useMutation({
@@ -97,6 +95,7 @@ export default function ArticleAdmin() {
       setForm(EMPTY_FORM);
       setImagePrompt("");
       setGeneratedImage(null);
+      setUrlOverrides({ slug: false, path: false });
     },
     onError: error => toast.error(error.message),
   });
@@ -152,8 +151,8 @@ export default function ArticleAdmin() {
 
   const updateTitle = (title: string) => {
     setForm(current => {
-      const slug = current.id || current.slug ? current.slug : makeSlug(title);
-      const path = current.id || current.path !== "/blog/" ? current.path : `/blog/${slug}/`;
+      const slug = current.id || urlOverrides.slug ? current.slug : normalizeArticleSlug(title);
+      const path = current.id || urlOverrides.path ? current.path : canonicalInsightPath(slug);
       return {
         ...current,
         title,
@@ -165,11 +164,33 @@ export default function ArticleAdmin() {
     });
   };
 
+  const updateSlug = (value: string) => {
+    const slug = normalizeArticleSlug(value);
+    setUrlOverrides(current => ({ ...current, slug: true }));
+    setForm(current => ({
+      ...current,
+      slug,
+      path: urlOverrides.path ? current.path : canonicalInsightPath(slug),
+    }));
+  };
+
+  const updateCanonicalPath = (value: string) => {
+    setUrlOverrides(current => ({ ...current, path: true }));
+    updateField("path", value);
+  };
+
+  const startNewArticle = () => {
+    setForm(EMPTY_FORM);
+    setImagePrompt("");
+    setGeneratedImage(null);
+    setUrlOverrides({ slug: false, path: false });
+  };
+
   const selectArticle = (article: NonNullable<typeof articleQuery.data>[number]) => {
     setForm({
       id: article.id,
       path: article.path,
-      slug: article.slug ?? makeSlug(article.path.split("/").filter(Boolean).at(-1) ?? article.title),
+      slug: article.slug ?? normalizeArticleSlug(article.path.split("/").filter(Boolean).at(-1) ?? article.title),
       title: article.title,
       excerpt: article.excerpt ?? article.description,
       bodyText: blocksToText(article.body ?? article.blocks),
@@ -186,6 +207,7 @@ export default function ArticleAdmin() {
     setShowPreview(false);
     setGeneratedImage(null);
     setImagePrompt("");
+    setUrlOverrides({ slug: true, path: true });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -261,7 +283,7 @@ export default function ArticleAdmin() {
         </div>
         <div className="admin-heading-actions">
           <Button variant="outline" onClick={() => setShowPreview(value => !value)}><Eye />{showPreview ? "Close preview" : "Preview"}</Button>
-          <Button variant="outline" onClick={() => { setForm(EMPTY_FORM); setImagePrompt(""); setGeneratedImage(null); }}><FilePlus2 />New article</Button>
+          <Button variant="outline" onClick={startNewArticle}><FilePlus2 />New article</Button>
           <Button onClick={() => save()} disabled={isSaving}><Check />{isSaving ? "Saving…" : "Save"}</Button>
         </div>
       </header>
@@ -288,8 +310,8 @@ export default function ArticleAdmin() {
           <div className="admin-section-title"><Pencil /><div><h2>{form.id ? "Edit article" : "New article"}</h2><p>{form.id ? `Article #${form.id}` : "Start as a draft, then publish when ready."}</p></div></div>
           <div className="admin-form-grid">
             <div className="admin-field admin-field-wide"><Label htmlFor="article-title">Title</Label><Input id="article-title" value={form.title} onChange={event => updateTitle(event.target.value)} /></div>
-            <div className="admin-field"><Label htmlFor="article-slug">Slug</Label><Input id="article-slug" value={form.slug} onChange={event => updateField("slug", makeSlug(event.target.value))} /></div>
-            <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateField("path", event.target.value)} /></div>
+            <div className="admin-field"><Label htmlFor="article-slug">Slug</Label><Input id="article-slug" value={form.slug} onChange={event => updateSlug(event.target.value)} placeholder="generated-from-the-title" /><small>{form.id || urlOverrides.slug ? "Custom slug preserved. Edit only when you intentionally want a different URL." : "Generated automatically from the title."}</small></div>
+            <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateCanonicalPath(event.target.value)} placeholder="/insights/generated-from-the-title/" /><small>{form.id || urlOverrides.path ? "Custom canonical path preserved." : "Generated automatically as /insights/{slug}/."}</small></div>
             <div className="admin-field admin-field-wide"><Label htmlFor="article-excerpt">Excerpt</Label><Textarea id="article-excerpt" className="admin-excerpt-input" rows={8} value={form.excerpt} onChange={event => updateField("excerpt", event.target.value)} placeholder="Write the summary readers will see on the Insights page and in search previews." /><small>Use this larger workspace to shape a clear, useful summary before writing the full article.</small></div>
             <div className="admin-field admin-field-wide"><Label htmlFor="article-body">Article body</Label><Textarea id="article-body" className="admin-body-input" rows={16} value={form.bodyText} onChange={event => updateField("bodyText", event.target.value)} placeholder="Use ## for section headings, ### for subheadings, and - for list items." /><small>Formatting: <strong>## Heading</strong>, <strong>### Subheading</strong>, <strong>- List item</strong>. Blank lines separate paragraphs.</small></div>
             <div className="admin-field"><Label htmlFor="article-author">Author</Label><Input id="article-author" value={form.authorName} onChange={event => updateField("authorName", event.target.value)} /></div>

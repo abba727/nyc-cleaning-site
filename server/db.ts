@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { articles, inquiries, inquiryResponses, InsertArticle, InsertInquiry, InsertInquiryResponse, InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -212,6 +212,18 @@ export async function listAllArticles() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   return db.select().from(articles).orderBy(desc(articles.updatedAt), desc(articles.id));
+}
+
+export async function findArticleUrlConflict(input: { path: string; slug: string; excludeId?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const urlMatch = or(eq(articles.path, input.path), eq(articles.slug, input.slug));
+  const rows = await db
+    .select({ id: articles.id, path: articles.path, slug: articles.slug })
+    .from(articles)
+    .where(input.excludeId ? and(urlMatch, ne(articles.id, input.excludeId)) : urlMatch)
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function createArticle(input: InsertArticle) {

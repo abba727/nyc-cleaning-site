@@ -22,4 +22,13 @@ describe("Insight editor workflow", () => {
     expect(source).toContain('id="article-excerpt"');
     expect(source).toContain('className="admin-excerpt-input" rows={8}');
   });
+
+  it("generates new Insight URLs from the title while preserving intentional overrides", () => {
+    expect(source).toContain("normalizeArticleSlug(title)");
+    expect(source).toContain("canonicalInsightPath(slug)");
+    expect(source).toContain('setUrlOverrides(current => ({ ...current, slug: true }))');
+    expect(source).toContain('setUrlOverrides(current => ({ ...current, path: true }))');
+    expect(source).toContain('setUrlOverrides({ slug: true, path: true })');
+    expect(source).toContain("Generated automatically as /insights/{slug}/.");
+  });
 });

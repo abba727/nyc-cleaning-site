@@ -2,7 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
-import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
+import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, findArticleUrlConflict, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { generateImage } from "./_core/imageGeneration";
 import { systemRouter } from "./_core/systemRouter";
@@ -97,6 +97,21 @@ const articleInput = z.object({
   status: z.enum(["draft", "published"]),
   publishedAt: z.coerce.date().nullable().optional(),
 });
+
+async function ensureArticleUrlAvailable(input: { path: string; slug: string }, excludeId?: number) {
+  const conflict = await findArticleUrlConflict({ path: input.path, slug: input.slug, excludeId });
+  if (!conflict) return;
+  if (conflict.path === input.path) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "That canonical path is already used by another Insight. Edit the title or canonical path and try again.",
+    });
+  }
+  throw new TRPCError({
+    code: "CONFLICT",
+    message: "That slug is already used by another Insight. Add a distinguishing word to the title or edit the slug.",
+  });
+}
 
 const cmsRole = z.enum(["admin", "content_manager"]);
 const emailInput = z.string().trim().toLowerCase().email().max(320);
@@ -412,6 +427,7 @@ export const appRouter = router({
     ),
     adminList: adminProcedure.query(() => listAllArticles()),
     create: adminProcedure.input(articleInput).mutation(async ({ input, ctx }) => {
+      await ensureArticleUrlAvailable(input);
       const id = await createArticle({
         ...input,
         description: input.excerpt,
@@ -424,6 +440,7 @@ export const appRouter = router({
     }),
     update: adminProcedure.input(articleInput.extend({ id: z.number().int().positive() })).mutation(async ({ input }) => {
       const { id, ...article } = input;
+      await ensureArticleUrlAvailable(article, id);
       await updateArticle(id, {
         ...article,
         description: article.excerpt,

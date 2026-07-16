@@ -6,6 +6,7 @@ const dbMocks = vi.hoisted(() => ({
   createArticle: vi.fn(),
   createInquiry: vi.fn(),
   deleteArticle: vi.fn(),
+  findArticleUrlConflict: vi.fn(),
   getPublishedArticleByPath: vi.fn(),
   listAllArticles: vi.fn(),
   listPublishedArticles: vi.fn(),
@@ -63,7 +64,10 @@ const validArticle = {
 };
 
 describe("article CMS authorization and contracts", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMocks.findArticleUrlConflict.mockResolvedValue(null);
+  });
 
   it("normalizes public canonical paths and only uses the published-article lookup", async () => {
     dbMocks.getPublishedArticleByPath.mockResolvedValue(null);
@@ -101,6 +105,38 @@ describe("article CMS authorization and contracts", () => {
       status: "draft",
       publishedAt: null,
     }));
+    expect(dbMocks.findArticleUrlConflict).toHaveBeenCalledWith({
+      path: validArticle.path,
+      slug: validArticle.slug,
+      excludeId: undefined,
+    });
+  });
+
+  it("returns a clear error when another Insight already uses the canonical path", async () => {
+    dbMocks.findArticleUrlConflict.mockResolvedValue({ id: 91, path: validArticle.path, slug: "different-slug" });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.create(validArticle)).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: expect.stringContaining("canonical path is already used"),
+    });
+    expect(dbMocks.createArticle).not.toHaveBeenCalled();
+  });
+
+  it("returns a clear error when another Insight already uses the slug", async () => {
+    dbMocks.findArticleUrlConflict.mockResolvedValue({ id: 92, path: "/insights/another-path/", slug: validArticle.slug });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.update({ id: 44, ...validArticle })).rejects.toMatchObject({
+      code: "CONFLICT",
+      message: expect.stringContaining("slug is already used"),
+    });
+    expect(dbMocks.findArticleUrlConflict).toHaveBeenCalledWith({
+      path: validArticle.path,
+      slug: validArticle.slug,
+      excludeId: 44,
+    });
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
   });
 
   it("uploads CMS cover images to deployment-safe object storage", async () => {
