@@ -222,4 +222,4 @@
 - [x] Add regression coverage for normalization, synchronization, manual overrides, existing-article preservation, and duplicate handling.
 - [x] Validate the editor workflow, Vitest, TypeScript, production build, responsive UI, and runtime logs.
 - [x] Publish the automatic Insight URL workflow.
-- [ ] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published release and complete checkpoint history to `abba727/nyc-cleaning-site` on GitHub.
