@@ -2,6 +2,7 @@ import rawSiteData from "./site-data.json";
 import rawLegacyContent from "./legacy-articles.json";
 import rawArticleImages from "./article-images.json";
 import { brandAssets } from "./assets";
+import { getServiceContent } from "./service-content";
 
 export type SitePage = {
   path: string;
@@ -32,7 +33,11 @@ export type LegacyContent = {
   sourceUrl: string;
 };
 
-export const pages = rawSiteData.pages as SitePage[];
+export const pages = (rawSiteData.pages as SitePage[]).map(page => {
+  if (page.kind !== "service") return page;
+  const content = getServiceContent(page.path);
+  return content ? { ...page, description: content.summary } : page;
+});
 export const services = pages.filter(page => page.kind === "service");
 const serviceLabelByPath: Record<string, string> = {
   "/services/common-area-maintenance-services-nyc/": "Common Area Maintenance",

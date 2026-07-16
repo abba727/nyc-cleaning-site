@@ -163,3 +163,9 @@
 - [x] Align the CMS invite-user email, role selector, and send-invitation button on a consistent baseline across desktop and mobile layouts.
 - [x] Give CMS role dropdown menus a fully opaque surface, correct foreground contrast, and sufficient stacking so underlying cards never show through.
 - [x] Add regression coverage and responsive visual validation for the corrected CMS invitation controls before publishing.
+- [x] Inventory every public service page, its canonical URL, current introduction, benefit content, call to action, related-service links, and first-/third-person brand references.
+- [x] Define and implement one consistent service-page structure: concise introduction, reader-focused benefit bullets, clear call-to-action section, and relevant related services.
+- [x] Rewrite all service-page copy in NYC Cleaning’s first-person plural voice, replacing “they/their” references to the company with natural “we/our” language.
+- [x] Remove repetitive, vague, or internally focused service-page wording while preserving factual claims, route coverage, metadata intent, and canonical URLs.
+- [x] Add automated audits for service-page structure, brand voice, benefit count, CTA presence, related-service validity, and legacy URL preservation.
+- [x] Validate every revised service page at desktop and mobile sizes, run the full test/build suite, publish, and confirm the live result.

@@ -177,6 +177,14 @@ p { margin: 0 0 1.2rem; }
 .service-quote-card h2 { margin-bottom: 0.8rem; font-size: 1.85rem; }
 .service-quote-card > p:not(.eyebrow) { color: #cad8e1; }
 .service-quote-card > a:last-child { margin-top: 1rem; color: var(--gold); font-family: "Archivo", sans-serif; font-weight: 800; }
+.service-benefits-section { background: var(--cream); }
+.service-benefits-layout { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: clamp(3rem, 8vw, 7rem); align-items: start; }
+.service-benefits-heading h2 { max-width: 660px; margin-bottom: 1rem; font-size: clamp(2rem, 4vw, 3.45rem); }
+.service-benefits-heading > p:last-child { max-width: 560px; color: var(--muted); }
+.service-benefit-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.service-benefit-list li { display: grid; grid-template-columns: 34px 1fr; gap: 1rem; align-items: start; border-top: 1px solid #d7dfda; padding: 1.25rem 0; color: var(--navy); font-size: 1.12rem; line-height: 1.55; }
+.service-benefit-list li:last-child { border-bottom: 1px solid #d7dfda; }
+.service-benefit-list svg { width: 26px; height: 26px; margin-top: 0.08rem; color: var(--gold-dark); }
 .service-capabilities { background: var(--cream); }
 .capability-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.35rem; }
 .capability-card { position: relative; min-height: 330px; overflow: hidden; border-top: 4px solid var(--gold-dark); background: var(--white); padding: 2rem; box-shadow: 0 16px 42px rgb(11 31 51 / 0.07); }
@@ -300,7 +308,7 @@ p { margin: 0 0 1.2rem; }
   .trust-grid { grid-template-columns: 1fr 1fr; }
   .trust-grid > div, .trust-grid > div:first-child { border: 0; border-bottom: 1px solid var(--line); }
   .trust-grid > div:nth-child(odd) { border-right: 1px solid var(--line); }
-  .section-heading.split, .story-grid, .process-layout, .review-invite, .contact-band, .interior-hero-grid, .content-layout, .contact-page-grid, .article-hero-inner, .article-layout, .archive-browser, .service-intro-layout, .service-process-layout { grid-template-columns: 1fr; gap: 2.5rem; }
+  .section-heading.split, .story-grid, .process-layout, .review-invite, .contact-band, .interior-hero-grid, .content-layout, .contact-page-grid, .article-hero-inner, .article-layout, .archive-browser, .service-intro-layout, .service-benefits-layout, .service-process-layout { grid-template-columns: 1fr; gap: 2.5rem; }
   .capability-grid { grid-template-columns: 1fr; }
   .capability-card { min-height: 0; }
   .capability-card:nth-child(2) { transform: none; }

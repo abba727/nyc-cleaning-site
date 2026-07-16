@@ -1,9 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowRight, BadgeCheck, Building2, CalendarDays, CheckCircle2, Clock3, Layers3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
+import { ArrowRight, BadgeCheck, Building2, CalendarDays, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
 import { brandAssets } from "@/content/assets";
 import { articlesForArchive, company, featuredServices, getArticleImage, getArticleImageAlt, getLegacyByPath, getPageByPath, getPageImage, isBlogArchivePath, legacyArchives, legacyArticles, normalizePath, pageParagraphs, services, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
+import { getServiceContent } from "@/content/service-content";
 import { trpc } from "@/lib/trpc";
 
 type ArticleView = LegacyContent & { coverImageUrl?: string; coverImageAlt?: string };
@@ -49,7 +50,7 @@ function ClientHead({ page }: { page: SitePage }) {
 function ServiceCards({ limit, items, compact = false }: { limit?: number; items?: SitePage[]; compact?: boolean }) {
   const source = items || featuredServices;
   const list = typeof limit === "number" ? source.slice(0, limit) : source;
-  return <div className={compact ? "service-grid service-grid-compact" : "service-grid"}>{list.map((service, index) => <article className="service-card" key={service.path}><Link href={service.path} className="service-image"><img src={getPageImage(service)} alt={`${serviceName(service)} in New York City`} loading={index < 3 ? "eager" : "lazy"} /></Link><div className="service-card-body"><p className="eyebrow">NYC property care</p><h3><Link href={service.path}>{serviceName(service)}</Link></h3>{!compact && <p>{pageParagraphs(service)[0] || service.description}</p>}<Link href={service.path} className="text-link">Explore service <ArrowRight size={16} aria-hidden="true" /></Link></div></article>)}</div>;
+  return <div className={compact ? "service-grid service-grid-compact" : "service-grid"}>{list.map((service, index) => <article className="service-card" key={service.path}><Link href={service.path} className="service-image"><img src={getPageImage(service)} alt={`${serviceName(service)} in New York City`} loading={index < 3 ? "eager" : "lazy"} /></Link><div className="service-card-body"><p className="eyebrow">NYC property care</p><h3><Link href={service.path}>{serviceName(service)}</Link></h3>{!compact && <p>{service.description}</p>}<Link href={service.path} className="text-link">Explore service <ArrowRight size={16} aria-hidden="true" /></Link></div></article>)}</div>;
 }
 
 function TrustStrip() {
@@ -94,8 +95,6 @@ function StandardPage({ page }: { page: SitePage }) {
   </>;
 }
 
-const serviceValueLabels = ["Property priorities", "Careful execution", "Ongoing support"];
-
 export function extractServiceFaqs(paragraphs: string[]) {
   const questionPattern = /(?:^|(?<=[.!]\s))((?:What|Why|How|When|Where|Who|Which|Can|Do|Does|Are|Is|Should|Will|Could|Would|Have|Has)\b[^?]{5,220}\?)/i;
   return paragraphs.flatMap((paragraph, index) => {
@@ -109,45 +108,20 @@ export function extractServiceFaqs(paragraphs: string[]) {
 }
 
 function ServiceDetailPage({ page }: { page: SitePage }) {
-  const paragraphs = pageParagraphs(page);
-  const intro = paragraphs.slice(0, 2);
-  const processIndices = paragraphs
-    .map((paragraph, index) => (/^Step\s+\d+\s*\|/i.test(paragraph) ? index : -1))
-    .filter(index => index >= 0);
-  const processSteps = processIndices.length
-    ? processIndices.slice(0, 4).map(index => {
-        const [label, title] = paragraphs[index].split("|").map(value => value.trim());
-        return { label, title: title || label, body: paragraphs[index + 1] || "Our team confirms the next step with you." };
-      })
-    : [
-        { label: "Step 1", title: "Share your property needs", body: "Tell us about the property, operating hours, priorities, and current challenges." },
-        { label: "Step 2", title: "Review a tailored scope", body: "We align the service plan and frequency with your building and schedule." },
-        { label: "Step 3", title: "Confirm the plan", body: "Your team receives a clear scope, schedule, and point of contact before work begins." },
-        { label: "Step 4", title: "Begin dependable service", body: "Our professionals perform the agreed work with responsive ongoing support." },
-      ];
-  const processText = new Set(processIndices.flatMap(index => [paragraphs[index], paragraphs[index + 1]]).filter(Boolean));
-  const featureCandidates = paragraphs
-    .slice(2)
-    .filter(paragraph => !processText.has(paragraph) && paragraph.length < 330)
-    .sort((a, b) => Number(b.includes(":")) - Number(a.includes(":")))
-    .slice(0, 3);
-  const used = new Set([...intro, ...featureCandidates, ...Array.from(processText)]);
-  const remaining = paragraphs.filter(paragraph => !used.has(paragraph));
-  const faqs = extractServiceFaqs(remaining);
-  const related = featuredServices.filter(service => service.path !== page.path).slice(0, 3);
+  const content = getServiceContent(page.path);
+  if (!content) return <StandardPage page={page} />;
+  const related = content.relatedPaths
+    .map(path => getPageByPath(path))
+    .filter((service): service is SitePage => Boolean(service));
 
   return <>
     <InteriorHero page={page} />
-    <section className="section service-intro-section"><div className="container service-intro-layout"><article className="service-intro-copy"><p className="eyebrow">Service overview</p><h2>Dependable {serviceName(page).toLowerCase()} for New York properties.</h2>{intro.map((paragraph, index) => <p className={index === 0 ? "lead" : undefined} key={paragraph}>{paragraph}</p>)}</article><aside className="service-quote-card"><ShieldCheck aria-hidden="true" /><p className="eyebrow">Built around your building</p><h2>Get a scope that fits the property.</h2><p>We’ll review your priorities, schedule, service requirements, and operating constraints.</p><Link href="/contact/" className="button button-gold">Request a Walkthrough</Link><a href={`tel:${company.phoneHref}`}>{company.phoneDisplay}</a></aside></div></section>
+    <section className="section service-intro-section"><div className="container service-intro-layout"><article className="service-intro-copy"><p className="eyebrow">Service overview</p><h2>{serviceName(page)} designed around your needs.</h2><p className="lead">{content.intro}</p></article><aside className="service-quote-card"><ShieldCheck aria-hidden="true" /><p className="eyebrow">Built around your property</p><h2>Get a scope that fits.</h2><p>We’ll review your priorities, schedule, service requirements, and operating constraints.</p><Link href="/contact/" className="button button-gold">Request a Walkthrough</Link><a href={`tel:${company.phoneHref}`}>{company.phoneDisplay}</a></aside></div></section>
 
-    <section className="section service-capabilities"><div className="container"><div className="section-heading split"><div><p className="eyebrow">What the service supports</p><h2>A practical plan, not a one-size-fits-all checklist.</h2></div><p>Each property has different traffic, surfaces, operating hours, and priorities. The service is organized around the source requirements documented for this offering.</p></div><div className="capability-grid">{featureCandidates.map((paragraph, index) => { const separator = paragraph.indexOf(":"); const title = separator > 0 && separator < 80 ? paragraph.slice(0, separator) : serviceValueLabels[index]; const body = separator > 0 && separator < 80 ? paragraph.slice(separator + 1).trim() : paragraph; return <article className="capability-card" key={paragraph}><span>0{index + 1}</span><Layers3 aria-hidden="true" /><h3>{title}</h3><p>{body}</p></article>; })}</div></div></section>
+    <section className="section service-benefits-section"><div className="container service-benefits-layout"><div className="service-benefits-heading"><p className="eyebrow">How this service helps</p><h2>Practical benefits for your property and the people who use it.</h2><p>We shape the work around the outcome you need, not a one-size-fits-all checklist.</p></div><ul className="service-benefit-list">{content.benefits.map(benefit => <li key={benefit}><CheckCircle2 aria-hidden="true" /><span>{benefit}</span></li>)}</ul></div></section>
 
-    <section className="section service-process-section"><div className="container service-process-layout"><div className="service-process-heading"><p className="eyebrow light">A clear path to service</p><h2>From the first request to an active property-care plan.</h2><p>Simple steps keep the scope, timing, and expectations clear before the work begins.</p></div><ol className="service-process-list">{processSteps.map((step, index) => <li key={`${step.label}-${index}`}><span>{String(index + 1).padStart(2, "0")}</span><div><small>{step.label}</small><h3>{step.title}</h3><p>{step.body}</p></div></li>)}</ol></div></section>
-
-    {faqs.length > 0 && <section className="section service-details-section"><div className="container service-faq-layout"><div className="service-faq-heading"><p className="eyebrow">Questions & answers</p><h2>Common questions about {serviceName(page).toLowerCase()}.</h2><p>Questions retained from the original service information are presented in one clear, consistent format.</p></div><div className="service-faq-list">{faqs.map((faq, index) => <details className="service-faq-item" key={`${faq.question}-${index}`} open={index === 0}><summary><span>{faq.question}</span></summary><div className="service-faq-answer">{faq.answers.map((answer, answerIndex) => <p key={`${answer.slice(0, 60)}-${answerIndex}`}>{answer}</p>)}</div></details>)}</div></div></section>}
-
-    <section className="section related-services-section"><div className="container"><div className="section-heading split"><div><p className="eyebrow">Related capabilities</p><h2>More ways we support NYC properties.</h2></div><p>Combine cleaning, staffing, waste handling, and maintenance into one coordinated property-care plan.</p></div><ServiceCards items={related} /></div></section>
-    <section className="section section-contact"><div className="container contact-band"><div><p className="eyebrow light">Build your service plan</p><h2>Talk with our team about {serviceName(page).toLowerCase()}.</h2><p>Tell us about your property and schedule. We’ll follow up with a tailored next step.</p></div><InquiryForm compact sourcePath={page.path} /></div></section>
+    <section className="section section-contact"><div className="container contact-band"><div><p className="eyebrow light">Plan your service</p><h2>Talk with us about {serviceName(page).toLowerCase()}.</h2><p>Tell us about your property, priorities, and preferred schedule. We’ll recommend a practical next step.</p></div><InquiryForm compact sourcePath={page.path} /></div></section>
+    <section className="section related-services-section"><div className="container"><div className="section-heading split"><div><p className="eyebrow">Similar services</p><h2>Explore other ways we can support your property.</h2></div><p>These services complement {serviceName(page).toLowerCase()} and can be combined in one coordinated property-care plan.</p></div><ServiceCards items={related} /></div></section>
   </>;
 }
 

@@ -12,6 +12,21 @@ import { getPublishedArticleByPath } from "../../server/db";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
+const ARTICLE_LOOKUP_TIMEOUT_MS = 2_000;
+
+async function getCmsArticleForRender(pathname: string) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      getPublishedArticleByPath(pathname),
+      new Promise<undefined>(resolve => {
+        timeout = setTimeout(() => resolve(undefined), ARTICLE_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 export function isKnownPublicPath(url: string) {
   return Boolean(getPageByPath(url) || getLegacyByPath(url) || isBlogArchivePath(url));
@@ -22,7 +37,9 @@ export async function render(url: string) {
   const matchedPage = getPageByPath(pathname);
   const matchedLegacy = getLegacyByPath(pathname);
   const isSyntheticArchive = isBlogArchivePath(pathname);
-  const cmsArticle = !matchedPage && !isSyntheticArchive ? await getPublishedArticleByPath(pathname) : undefined;
+  const cmsArticle = !matchedPage && !matchedLegacy && !isSyntheticArchive
+    ? await getCmsArticleForRender(pathname)
+    : undefined;
   const page = matchedPage || pages[0];
   const seo = cmsArticle
     ? { path: cmsArticle.path, title: cmsArticle.seoTitle || cmsArticle.title, description: cmsArticle.metaDescription || cmsArticle.excerpt || cmsArticle.description, h1: cmsArticle.title, kind: "blog" }
