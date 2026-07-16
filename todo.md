@@ -243,4 +243,4 @@
 - [x] Add regression coverage for article generation, word-count range, heading structure, editor height, click-only replacement, and canonical-path behavior.
 - [x] Validate the complete workflow responsively with Vitest, TypeScript, production build, and runtime-log review.
 - [x] Publish the article-generation and canonical-path alignment release.
-- [ ] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
