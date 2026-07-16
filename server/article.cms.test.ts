@@ -14,16 +14,23 @@ const dbMocks = vi.hoisted(() => ({
   updateInquiryNotificationStatus: vi.fn(),
 }));
 
-const storageMocks = vi.hoisted(() => ({ storagePut: vi.fn() }));
+const storageMocks = vi.hoisted(() => ({ storageGetSignedUrl: vi.fn(), storagePut: vi.fn() }));
 const imageGenerationMocks = vi.hoisted(() => ({ generateImage: vi.fn() }));
+const imageDescriptionMocks = vi.hoisted(() => ({
+  fallbackArticleCoverDescription: vi.fn(),
+  generateArticleCoverDescription: vi.fn(),
+}));
 const seoGenerationMocks = vi.hoisted(() => ({ generateArticleSeoFields: vi.fn() }));
 const articleGenerationMocks = vi.hoisted(() => ({ generateArticleFromTopic: vi.fn() }));
+const titleGenerationMocks = vi.hoisted(() => ({ generateArticleTitleSuggestion: vi.fn() }));
 
 vi.mock("./db", () => dbMocks);
 vi.mock("./storage", () => storageMocks);
 vi.mock("./_core/imageGeneration", () => imageGenerationMocks);
+vi.mock("./articleImageDescription", () => imageDescriptionMocks);
 vi.mock("./articleSeoGeneration", () => seoGenerationMocks);
 vi.mock("./articleGeneration", () => articleGenerationMocks);
+vi.mock("./articleTitleGeneration", () => titleGenerationMocks);
 vi.mock("./_core/notification", () => ({ notifyOwner: vi.fn() }));
 
 import { appRouter } from "./routers";
@@ -71,6 +78,8 @@ describe("article CMS authorization and contracts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.findArticleUrlConflict.mockResolvedValue(null);
+    imageDescriptionMocks.fallbackArticleCoverDescription.mockReturnValue("Editorial cover illustrating the article topic");
+    storageMocks.storageGetSignedUrl.mockResolvedValue("https://storage.example.com/generated/article-cover.png");
   });
 
   it("normalizes public canonical paths and only uses the published-article lookup", async () => {
@@ -170,6 +179,9 @@ describe("article CMS authorization and contracts", () => {
       key: "generated/nyc-lobby.png",
       url: "/manus-storage/nyc-lobby.png",
     });
+    imageDescriptionMocks.generateArticleCoverDescription.mockResolvedValue(
+      "A porter cleans the stone floor of a busy New York apartment lobby",
+    );
     const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
 
     const result = await caller.article.generateCover({
@@ -182,11 +194,36 @@ describe("article CMS authorization and contracts", () => {
     expect(result).toEqual({
       key: "generated/nyc-lobby.png",
       url: "/manus-storage/nyc-lobby.png",
+      description: "A porter cleans the stone floor of a busy New York apartment lobby",
     });
     expect(imageGenerationMocks.generateImage).toHaveBeenCalledWith({
       prompt: expect.stringMatching(/Article Body:[\s\S]*New York apartment lobby porter[\s\S]*Optional visual direction from the editor: A wide eye-level view/),
     });
+    expect(storageMocks.storageGetSignedUrl).toHaveBeenCalledWith("generated/nyc-lobby.png");
+    expect(imageDescriptionMocks.generateArticleCoverDescription).toHaveBeenCalledWith(
+      expect.objectContaining({ body: body.trim() }),
+      "https://storage.example.com/generated/article-cover.png",
+    );
     expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+  });
+
+  it("returns an article-derived description fallback without discarding a successful generated image", async () => {
+    const body = "A detailed Article Body about New York lobby floors, entry glass, elevator detailing, porter service windows, deliveries, and resident traffic. ".repeat(2);
+    imageGenerationMocks.generateImage.mockResolvedValue({ key: "generated/fallback.png", url: "/manus-storage/fallback.png" });
+    imageDescriptionMocks.fallbackArticleCoverDescription.mockReturnValue("Editorial cover illustrating a New York lobby cleaning plan");
+    imageDescriptionMocks.generateArticleCoverDescription.mockRejectedValue(new Error("Temporary model error"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    try {
+      await expect(caller.article.generateCover({ body })).resolves.toEqual({
+        key: "generated/fallback.png",
+        url: "/manus-storage/fallback.png",
+        description: "Editorial cover illustrating a New York lobby cleaning plan",
+      });
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it("requires the Article Body under the new cover contract and rejects the retired prompt-only shape", async () => {
@@ -227,6 +264,33 @@ describe("article CMS authorization and contracts", () => {
       body: "A sufficiently developed Article Body about a New York apartment lobby, porter schedules, entrance floors, glass, elevators, and resident-facing maintenance standards. ".repeat(2),
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(imageGenerationMocks.generateImage).not.toHaveBeenCalled();
+  });
+
+  it("lets a content manager suggest an editable title from the Article Body without saving", async () => {
+    const body = "A practical New York property cleaning article body with enough detailed guidance for the editor. ".repeat(4);
+    titleGenerationMocks.generateArticleTitleSuggestion.mockResolvedValue({ title: "How to Plan Reliable NYC Property Cleaning" });
+    const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+
+    await expect(caller.article.suggestTitle({ body })).resolves.toEqual({
+      title: "How to Plan Reliable NYC Property Cleaning",
+    });
+    expect(titleGenerationMocks.generateArticleTitleSuggestion).toHaveBeenCalledWith(body.trim());
+    expect(dbMocks.updateArticle).not.toHaveBeenCalled();
+    expect(dbMocks.createArticle).not.toHaveBeenCalled();
+  });
+
+  it("requires a developed Article Body and CMS authorization before suggesting a title", async () => {
+    const manager = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
+    await expect(manager.article.suggestTitle({ body: "Too short." })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringContaining("at least 200 characters"),
+    });
+
+    const ordinaryUser = appRouter.createCaller(context(user({ openId: "not-an-owner", role: "user" })));
+    await expect(ordinaryUser.article.suggestTitle({
+      body: "A sufficiently long Article Body that an ordinary user must not submit for title generation. ".repeat(4),
+    })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(titleGenerationMocks.generateArticleTitleSuggestion).not.toHaveBeenCalled();
   });
 
   it("lets a content manager generate editable supporting text from the Article Body without saving it", async () => {

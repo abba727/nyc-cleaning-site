@@ -14,7 +14,7 @@ import { toast } from "sonner";
 type EditorStatus = "draft" | "published";
 type EditorFilterStatus = "all" | ArticlePublicationState;
 type GeneratedField = "excerpt" | "seoTitle" | "metaDescription";
-type GenerationTarget = "article" | GeneratedField;
+type GenerationTarget = "article" | "title" | GeneratedField;
 
 const GENERATED_FIELD_LABELS: Record<GeneratedField, string> = {
   excerpt: "excerpt",
@@ -101,7 +101,7 @@ export default function ArticleAdmin() {
   const [page, setPage] = useState(1);
   const [showPreview, setShowPreview] = useState(false);
   const [imagePrompt, setImagePrompt] = useState("");
-  const [generatedImage, setGeneratedImage] = useState<{ url: string; key: string | null } | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<{ url: string; key: string | null; description: string } | null>(null);
   const [urlOverrides, setUrlOverrides] = useState({ slug: false, path: false });
   const [generatingField, setGeneratingField] = useState<GenerationTarget | null>(null);
   const [generationErrors, setGenerationErrors] = useState<Partial<Record<GenerationTarget, string>>>({});
@@ -149,6 +149,7 @@ export default function ArticleAdmin() {
   });
   const generateSeoFields = trpc.article.generateSeoFields.useMutation();
   const generateArticleMutation = trpc.article.generateArticle.useMutation();
+  const suggestTitle = trpc.article.suggestTitle.useMutation();
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -315,6 +316,33 @@ export default function ArticleAdmin() {
     }
   };
 
+  const suggestTitleFromBody = async () => {
+    const body = form.bodyText.trim();
+    setGenerationErrors(current => ({ ...current, title: undefined }));
+    if (body.length < ARTICLE_BODY_MIN_GENERATION_LENGTH) {
+      setGenerationErrors(current => ({
+        ...current,
+        title: `Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before suggesting a title.`,
+      }));
+      return;
+    }
+    if (form.title.trim() && !window.confirm("Suggest title will replace the current Title. Continue?")) return;
+
+    setGeneratingField("title");
+    try {
+      const result = await suggestTitle.mutateAsync({ body });
+      updateTitle(result.title);
+      toast.success("Title suggested from the Article Body. Review and edit it before saving.");
+    } catch (error) {
+      setGenerationErrors(current => ({
+        ...current,
+        title: error instanceof Error ? error.message : "A title could not be suggested. Please try again.",
+      }));
+    } finally {
+      setGeneratingField(null);
+    }
+  };
+
   const generateArticleFromTopic = async () => {
     const topic = form.bodyText.trim();
     setGenerationErrors(current => ({ ...current, article: undefined }));
@@ -427,7 +455,18 @@ export default function ArticleAdmin() {
         <section className="admin-editor-panel">
           <div className="admin-section-title"><Pencil /><div><h2>{form.id ? "Edit article" : "New article"}</h2><p>{form.id ? `Article #${form.id}` : "Start as a draft, then publish when ready."}</p></div></div>
           <div className="admin-form-grid">
-            <div className="admin-field admin-field-wide"><Label htmlFor="article-title">Title</Label><Input id="article-title" value={form.title} onChange={event => updateTitle(event.target.value)} /></div>
+            <div className="admin-field admin-field-wide">
+              <Label htmlFor="article-title">Title</Label>
+              <Input id="article-title" value={form.title} onChange={event => updateTitle(event.target.value)} placeholder="Suggest a title from the Article Body, or write your own." />
+              <div className="admin-field-footer">
+                <small>The suggestion uses only the existing Article Body and remains fully editable.</small>
+                <button type="button" className="admin-generate-link" onClick={() => void suggestTitleFromBody()} disabled={generatingField !== null} aria-label="Suggest title from Article Body">
+                  {generatingField === "title" ? <Spinner className="size-3.5" /> : <Sparkles aria-hidden="true" />}
+                  {generatingField === "title" ? "Suggesting…" : "Suggest title"}
+                </button>
+              </div>
+              {generationErrors.title ? <p className="admin-inline-error" role="alert">{generationErrors.title}</p> : null}
+            </div>
             <div className="admin-field"><Label htmlFor="article-slug">Slug</Label><Input id="article-slug" value={form.slug} onChange={event => updateSlug(event.target.value)} placeholder="generated-from-the-title" /><small>{form.id || urlOverrides.slug ? "Custom slug preserved. Edit only when you intentionally want a different URL." : "Generated automatically from the title."}</small></div>
             <div className="admin-field"><Label htmlFor="article-path">Canonical path</Label><Input id="article-path" value={form.path} onChange={event => updateCanonicalPath(event.target.value)} placeholder="/generated-from-the-title/" /><small>{form.id || urlOverrides.path ? "Custom canonical path preserved." : "Generated automatically as /{slug}/ to match existing Insights."}</small></div>
             <div className="admin-field admin-field-wide">
@@ -466,7 +505,7 @@ export default function ArticleAdmin() {
                 </div>
               </div>
             </div>
-            {generatedImage ? <div className="admin-generated-cover"><img src={generatedImage.url} alt="Newly generated article cover preview" /><div><strong>Generated preview</strong><p>Review the image carefully. Select it only if it accurately represents the article and NYC Cleaning.</p><Button type="button" onClick={() => { updateField("coverImageUrl", generatedImage.url); updateField("coverImageKey", generatedImage.key); setGeneratedImage(null); toast.success("Generated image selected as the cover"); }}><Check />Use this image</Button></div></div> : null}
+            {generatedImage ? <div className="admin-generated-cover"><img src={generatedImage.url} alt={generatedImage.description} /><div><strong>Generated preview</strong><p>Review the image carefully. Select it only if it accurately represents the article and NYC Cleaning.</p><Label htmlFor="generated-cover-description">Generated image description</Label><Input id="generated-cover-description" value={generatedImage.description} onChange={event => setGeneratedImage(current => current ? { ...current, description: event.target.value } : current)} /><small>This editable description will populate the article when you approve the image.</small><Button type="button" onClick={() => { updateField("coverImageUrl", generatedImage.url); updateField("coverImageKey", generatedImage.key); updateField("coverImageAlt", generatedImage.description); setGeneratedImage(null); toast.success("Generated image and description selected as the cover"); }}><Check />Use this image</Button></div></div> : null}
           </div>
 
           <div className="admin-subsection">

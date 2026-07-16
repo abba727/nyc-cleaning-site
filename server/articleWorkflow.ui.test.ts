@@ -17,6 +17,19 @@ describe("Insight editor workflow", () => {
     expect(source).toContain("Generated preview");
     expect(source).toContain("Use this image");
     expect(source).toContain('updateField("coverImageUrl", generatedImage.url)');
+    expect(source).toContain('updateField("coverImageAlt", generatedImage.description)');
+    expect(source).toContain('id="generated-cover-description"');
+    expect(source).toContain("This editable description will populate the article when you approve the image.");
+  });
+
+  it("suggests a title only after a click and keeps replacement under editor control", () => {
+    expect(source).toContain("suggestTitleFromBody");
+    expect(source).toContain('onClick={() => void suggestTitleFromBody()}');
+    expect(source).toContain('suggestTitle.mutateAsync({ body })');
+    expect(source).toContain('window.confirm("Suggest title will replace the current Title. Continue?")');
+    expect(source).toContain("updateTitle(result.title)");
+    expect(source).toContain("The suggestion uses only the existing Article Body and remains fully editable.");
+    expect(source).toContain('onChange={event => updateTitle(event.target.value)}');
   });
 
   it("derives generated cover subjects from the Article Body and treats visual direction as optional", () => {
@@ -80,6 +93,7 @@ describe("Insight editor workflow", () => {
     expect(source).toContain('onChange={event => updateField("excerpt", event.target.value)}');
     expect(source).toContain('onChange={event => updateField("seoTitle", event.target.value)}');
     expect(source).toContain('onChange={event => updateField("metaDescription", event.target.value)}');
+    expect(source).toContain('onChange={event => setGeneratedImage(current => current ? { ...current, description: event.target.value } : current)}');
   });
 
   it("shows short-body guidance and generated character limits", () => {

@@ -8,9 +8,11 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { generateArticleCover } from "./articleCoverGeneration";
+import { fallbackArticleCoverDescription, generateArticleCoverDescription } from "./articleImageDescription";
 import { generateArticleSeoFields } from "./articleSeoGeneration";
 import { generateArticleFromTopic } from "./articleGeneration";
-import { storagePut } from "./storage";
+import { generateArticleTitleSuggestion } from "./articleTitleGeneration";
+import { storageGetSignedUrl, storagePut } from "./storage";
 import {
   createCmsSessionToken,
   hashPassword,
@@ -496,7 +498,15 @@ export const appRouter = router({
       try {
         const result = await generateArticleCover(input);
         if (!result.url) throw new Error("The image service returned no image URL.");
-        return { url: result.url, key: result.key ?? null } as const;
+        let description = fallbackArticleCoverDescription(input);
+        try {
+          if (!result.key) throw new Error("The generated image returned no durable storage key for description analysis.");
+          const signedImageUrl = await storageGetSignedUrl(result.key);
+          description = await generateArticleCoverDescription(input, signedImageUrl);
+        } catch (descriptionError) {
+          console.error("[Article] AI cover description generation failed; using fallback", descriptionError);
+        }
+        return { url: result.url, key: result.key ?? null, description } as const;
       } catch (error) {
         const detail = error instanceof Error ? error.message : "Unknown image generation error";
         console.error("[Article] AI cover generation failed", {
@@ -506,6 +516,21 @@ export const appRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "The image service could not complete this request. Please try Generate image again in a moment.",
+        });
+      }
+    }),
+    suggestTitle: adminProcedure.input(z.object({
+      body: z.string().trim()
+        .min(ARTICLE_BODY_MIN_GENERATION_LENGTH, `Write at least ${ARTICLE_BODY_MIN_GENERATION_LENGTH} characters in the Article Body before suggesting a title.`)
+        .max(ARTICLE_BODY_MAX_GENERATION_LENGTH, `Keep the Article Body under ${ARTICLE_BODY_MAX_GENERATION_LENGTH.toLocaleString()} characters before suggesting a title.`),
+    })).mutation(async ({ input }) => {
+      try {
+        return await generateArticleTitleSuggestion(input.body);
+      } catch (error) {
+        console.error("[Article] AI title suggestion failed", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "A title could not be suggested. Review the Article Body and try again.",
         });
       }
     }),

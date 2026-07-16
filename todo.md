@@ -275,3 +275,11 @@
 - [x] Validate image generation from an existing article using the real service, then run Vitest, TypeScript, production build, responsive CMS checks, and runtime-log review.
 - [x] Publish the article-based cover-image generation repair.
 - [x] Push the published repair and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Re-read the required full-stack, LLM, and image-generation guidance and audit the current title, Article Body, cover generation, image description, and save flows.
+- [x] Add an authenticated option to suggest an editable Insight title derived from the existing Article Body without automatic overwrite.
+- [x] Populate an editable image description after AI cover generation using the article-derived image subject and generated result context.
+- [x] Preserve explicit cover-image approval, article URL override behavior, CMS role authorization, field limits, and durable image selection.
+- [x] Add regression coverage for body-based title suggestions, click-only title replacement, generated image descriptions, error handling, authorization, and save behavior.
+- [x] Validate both workflows with the configured AI services, responsive CMS checks, Vitest, TypeScript, production build, and current runtime-log review.
+- [x] Publish the title-suggestion and image-description release.
+- [ ] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
