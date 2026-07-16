@@ -264,4 +264,4 @@
 - [x] Add regression coverage for the six-card count, unique destinations, valid image assignments, and responsive grid behavior.
 - [x] Validate the revised homepage at desktop and mobile sizes, then run Vitest, TypeScript, production build, and current runtime-log checks.
 - [x] Publish the six-tile homepage service-grid update.
-- [ ] Push the published update and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Push the published update and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
