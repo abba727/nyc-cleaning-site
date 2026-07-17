@@ -17,6 +17,8 @@ export const ENV = {
   vertexProjectId: (process.env.VERTEX_AI_PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT ?? "").trim(),
   vertexLocation: (process.env.VERTEX_AI_LOCATION ?? "global").trim(),
   vertexModel: (process.env.VERTEX_AI_MODEL ?? "gemini-2.5-flash").trim(),
+  vertexImageLocation: (process.env.VERTEX_AI_IMAGE_LOCATION ?? "us-central1").trim(),
+  vertexImageModel: (process.env.VERTEX_AI_IMAGE_MODEL ?? "imagen-4.0-generate-001").trim(),
   gcsBucket: process.env.GCS_BUCKET ?? "",
   primaryAdminEmail: (process.env.PRIMARY_ADMIN_EMAIL ?? "info@nyccleaning.co").trim().toLowerCase(),
   resendApiKey: process.env.RESEND_API_KEY ?? "",

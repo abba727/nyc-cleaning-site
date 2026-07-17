@@ -280,7 +280,7 @@ type VertexAccessToken = {
 
 type VertexGenerateResponse = {
   candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
     finishReason?: string;
   }>;
   usageMetadata?: {
@@ -342,9 +342,16 @@ const invokeVertexLLM = async (params: InvokeParams): Promise<InvokeResult> => {
   }
 
   const normalizedResponseFormat = normalizeResponseFormat(params);
+  const structuredOutput = normalizedResponseFormat?.type === "json_schema"
+    || normalizedResponseFormat?.type === "json_object";
   const generationConfig: Record<string, unknown> = {
-    maxOutputTokens: params.max_tokens ?? params.maxTokens ?? 1024,
+    maxOutputTokens: params.max_tokens ?? params.maxTokens ?? (structuredOutput ? 2048 : 1024),
   };
+  if (structuredOutput && ENV.vertexModel.startsWith("gemini-2.5")) {
+    // The CMS metadata task is deterministic formatting, not multi-step reasoning.
+    // Disabling returned thinking preserves the full output budget for valid JSON.
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
   if (normalizedResponseFormat?.type === "json_schema") {
     generationConfig.responseMimeType = "application/json";
     generationConfig.responseSchema = normalizedResponseFormat.json_schema.schema;
@@ -378,7 +385,8 @@ const invokeVertexLLM = async (params: InvokeParams): Promise<InvokeResult> => {
   const result = (await response.json()) as VertexGenerateResponse;
   const candidate = result.candidates?.[0];
   const content = candidate?.content?.parts
-    ?.map(part => part.text ?? "")
+    ?.filter(part => !part.thought)
+    .map(part => part.text ?? "")
     .join("")
     .trim();
   if (!content) {
