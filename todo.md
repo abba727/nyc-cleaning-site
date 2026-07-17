@@ -292,3 +292,23 @@
 - [x] Produce an evidence-based SEO audit report summarizing findings, fixes, validation, and any external actions that cannot be completed in code.
 - [x] Publish the comprehensive SEO correction release.
 - [x] Push the published SEO release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Inventory the current user creation, email/password login, role authorization, content management, Resend delivery, inquiry persistence, and contact messaging dependencies.
+- [x] Define reusable module boundaries, configuration contracts, and adapter interfaces without changing the current NYC Cleaning behavior or security model.
+- [x] Extract configurable authentication and user-administration services covering primary-admin setup, invitations, password reset, session handling, roles, and revocation.
+- [x] Extract configurable content-management services covering article validation, CRUD, publishing states, canonical paths, media metadata, and authorization.
+- [x] Extract a reusable Resend mail adapter with configurable sender, recipients, templates, reply-to behavior, and safe delivery-error handling.
+- [x] Extract reusable contact and CRM services covering form validation, phone normalization, persistence, inquiry statuses, response history, and outbound replies.
+- [x] Refactor backend procedures to compose the reusable modules while preserving existing API contracts and production behavior.
+- [x] Refactor shared admin and public client workflows to consume configurable authentication, content, and contact contracts where practical.
+- [x] Add a portable schema and migration reference plus environment-variable and configuration documentation for adopting the modules in another project.
+- [x] Add a reusable integration guide and example composition showing how to enable user login, user management, CMS, Resend, and contact messaging independently or together.
+- [x] Add focused regressions for module configuration, authorization boundaries, validation, mail composition, CRM persistence, and backward compatibility.
+- [x] Run the complete Vitest suite, TypeScript checks, production build, responsive workflow validation, and runtime-log review.
+- [x] Supersede the in-place backend release with the selected standalone starter distribution, leaving the production application behavior unchanged.
+- [x] Create a standalone private `abba727/fullstack-content-crm-starter` repository with independent package metadata, configuration, documentation, and version history.
+- [x] Remove NYC Cleaning branding, recipients, canonical-domain assumptions, and business-specific content from the starter defaults while retaining a configurable reference implementation.
+- [x] Package topic-to-article generation, body-derived title suggestions, SEO title/meta/excerpt generation, and configurable structured-output validation as reusable AI text services.
+- [x] Package article-body-derived cover-image generation, optional visual direction, durable media persistence, explicit selection, and vision-derived editable image descriptions as reusable AI media services.
+- [x] Add provider adapters and feature flags so AI text, AI images, vision descriptions, storage, Resend, CMS, CRM, and user administration can be enabled independently.
+- [x] Add starter-specific tests, TypeScript validation, production build verification, setup documentation, example environment configuration, and an adoption checklist.
+- [x] Publish the validated standalone starter to its private GitHub repository and document how future projects should clone, configure, migrate, and upgrade it.
