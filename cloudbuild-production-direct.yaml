@@ -1,0 +1,62 @@
+# Direct production deployment. Intentionally contains only build, push, and service-deploy steps.
+substitutions:
+  _REGION: us-east1
+  _SERVICE: nyc-cleaning
+  _REPOSITORY: nyc-cleaning
+  _RUNTIME_SA: nyc-cleaning-runtime@nyc-cleaning.iam.gserviceaccount.com
+  _CLOUD_SQL_CONNECTION: nyc-cleaning:us-east1:nyc-cleaning-mysql
+  _DB_USER: nyc_app
+  _DB_NAME: nyc_cleaning
+  _GCS_BUCKET: nyc-cleaning-assets-788098464449
+  _APP_BASE_URL: https://www.nyccleaning.co
+  _PRIMARY_ADMIN_EMAIL: albert.aranbaev@gmail.com
+  _RESEND_FROM_EMAIL: NYC Cleaning <notifications@nyccleaning.co>
+  _DB_PASS_SECRET: nyc-cleaning-db-pass
+  _JWT_SECRET_NAME: nyc-cleaning-jwt-secret
+  _RESEND_API_KEY_SECRET: nyc-cleaning-resend-api-key
+
+steps:
+  - id: build-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+      - .
+
+  - id: push-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+
+  - id: deploy-production-service
+    name: gcr.io/google.com/cloudsdktool/google-cloud-cli:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --service-account=${_RUNTIME_SA}
+      - --set-cloudsql-instances=${_CLOUD_SQL_CONNECTION}
+      - --set-env-vars=NODE_ENV=production,APP_BASE_URL=${_APP_BASE_URL},PRIMARY_ADMIN_EMAIL=${_PRIMARY_ADMIN_EMAIL},DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},MYSQL_UNIX_SOCKET=/cloudsql/${_CLOUD_SQL_CONNECTION},DB_POOL_LIMIT=5,GCS_BUCKET=${_GCS_BUCKET},RESEND_FROM_EMAIL=${_RESEND_FROM_EMAIL}
+      - --set-secrets=DB_PASS=${_DB_PASS_SECRET}:latest,JWT_SECRET=${_JWT_SECRET_NAME}:latest,RESEND_API_KEY=${_RESEND_API_KEY_SECRET}:latest
+      - --port=8080
+      - --memory=512Mi
+      - --cpu=1
+      - --concurrency=40
+      - --max-instances=5
+      - --timeout=60s
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
