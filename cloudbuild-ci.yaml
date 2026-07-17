@@ -1,0 +1,50 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - id: install
+    name: node:22-bookworm
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        corepack enable
+        corepack prepare pnpm@10.4.1 --activate
+        pnpm install --frozen-lockfile
+
+  - id: typecheck
+    name: node:22-bookworm
+    entrypoint: bash
+    waitFor: [install]
+    args:
+      - -ceu
+      - |
+        corepack enable
+        corepack prepare pnpm@10.4.1 --activate
+        pnpm check
+
+  - id: test
+    name: node:22-bookworm
+    entrypoint: bash
+    waitFor: [install]
+    env:
+      - JWT_SECRET=cloud-build-ci-only-secret-with-sufficient-length
+    args:
+      - -ceu
+      - |
+        corepack enable
+        corepack prepare pnpm@10.4.1 --activate
+        pnpm test:ci
+
+  - id: application-build
+    name: node:22-bookworm
+    entrypoint: bash
+    waitFor: [install]
+    args:
+      - -ceu
+      - |
+        corepack enable
+        corepack prepare pnpm@10.4.1 --activate
+        pnpm build
+
+timeout: 1200s

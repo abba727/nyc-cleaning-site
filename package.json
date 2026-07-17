@@ -10,11 +10,13 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "test:ci": "vitest run --exclude server/resend.secret.test.ts --exclude server/seo.test.ts",
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:migrate": "node scripts/run-migrations.mjs",
+    "storage:migrate": "node scripts/migrate-assets-to-gcs.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.693.0",
-    "@aws-sdk/s3-request-presigner": "^3.693.0",
+    "@google-cloud/storage": "^7.17.0",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

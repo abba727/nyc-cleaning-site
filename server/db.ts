@@ -1,20 +1,50 @@
 import { and, asc, count, desc, eq, gt, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { createPool } from "mysql2";
 import { articles, inquiries, inquiryResponses, InsertArticle, InsertInquiry, InsertInquiryResponse, InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+function createCloudSqlDatabase() {
+  if (!ENV.dbUser || !ENV.dbName) return null;
+
+  const connectionLimit = Number.isFinite(ENV.dbPoolLimit)
+    ? Math.max(1, Math.min(ENV.dbPoolLimit, 20))
+    : 5;
+  const pool = createPool({
+    host: ENV.dbSocketPath ? undefined : ENV.dbHost,
+    port: ENV.dbSocketPath ? undefined : ENV.dbPort,
+    socketPath: ENV.dbSocketPath || undefined,
+    user: ENV.dbUser,
+    password: ENV.dbPassword,
+    database: ENV.dbName,
+    waitForConnections: true,
+    connectionLimit,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+  });
+
+  return drizzle(pool);
+}
+
+// Lazily create the Drizzle client so local tooling can run without a database.
+// Google Cloud deployments use a Cloud SQL Unix socket and a bounded pool;
+// existing environments can continue to provide DATABASE_URL.
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
+  if (_db) return _db;
+
+  try {
+    _db = createCloudSqlDatabase();
+    if (!_db && ENV.databaseUrl) {
+      _db = drizzle(ENV.databaseUrl);
     }
+  } catch (error) {
+    console.warn("[Database] Failed to initialize:", error);
+    _db = null;
   }
+
   return _db;
 }
 
