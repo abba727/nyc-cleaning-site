@@ -94,6 +94,30 @@ if ! gcloud sql instances describe "$SQL_INSTANCE" >/dev/null 2>&1; then
     --enable-bin-log
 fi
 
+wait_for_sql_instance() {
+  local max_attempts="${SQL_READY_MAX_ATTEMPTS:-60}"
+  local delay_seconds="${SQL_READY_DELAY_SECONDS:-10}"
+  local attempt state
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    state="$(gcloud sql instances describe "$SQL_INSTANCE" --format='value(state)' 2>/dev/null || true)"
+    if [[ "$state" == "RUNNABLE" ]]; then
+      return 0
+    fi
+    if [[ "$state" == "FAILED" || "$state" == "SUSPENDED" ]]; then
+      echo "Cloud SQL instance ${SQL_INSTANCE} entered terminal state ${state}." >&2
+      return 1
+    fi
+    echo "Waiting for Cloud SQL instance ${SQL_INSTANCE} to become RUNNABLE (current: ${state:-unknown}, attempt ${attempt}/${max_attempts})..."
+    sleep "$delay_seconds"
+  done
+
+  echo "Timed out waiting for Cloud SQL instance ${SQL_INSTANCE} to become RUNNABLE." >&2
+  return 1
+}
+
+wait_for_sql_instance
+
 if ! gcloud sql databases describe "$SQL_DATABASE" --instance="$SQL_INSTANCE" >/dev/null 2>&1; then
   gcloud sql databases create "$SQL_DATABASE" --instance="$SQL_INSTANCE" --charset=utf8mb4 --collation=utf8mb4_unicode_ci
 fi
