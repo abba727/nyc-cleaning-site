@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
+Disallow: /admin/
 Disallow: /api/
-Disallow: /wp-admin/
-Disallow: /wp-json/
+Disallow: /oauth/
 
 Sitemap: https://www.nyccleaning.co/sitemap.xml

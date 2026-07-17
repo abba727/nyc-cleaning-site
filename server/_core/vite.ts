@@ -14,8 +14,12 @@ export async function setupVite(app: Express, server: Server) {
     allowedHosts: true as const,
   };
 
+  const resolvedViteConfig = typeof viteConfig === "function"
+    ? await viteConfig({ command: "serve", mode: "development", isSsrBuild: false, isPreview: false })
+    : await viteConfig;
+
   const vite = await createViteServer({
-    ...viteConfig,
+    ...resolvedViteConfig,
     configFile: false,
     server: serverOptions,
     appType: "custom",
@@ -40,7 +44,7 @@ export async function setupVite(app: Express, server: Server) {
       const entry = await vite.ssrLoadModule("/src/entry-server.tsx");
       const rendered = await entry.render(url) as { html: string; head: string; status: number };
       const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
-      res.status(rendered.status).set({ "Content-Type": "text/html" }).end(page);
+      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -59,14 +63,14 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath, { index: false }));
+  app.use(express.static(distPath, { index: false, redirect: false }));
 
   app.use("*", async (req, res, next) => {
     try {
       const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
       const rendered = await renderProduction(req.originalUrl);
       const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
-      res.status(rendered.status).set({ "Content-Type": "text/html" }).end(page);
+      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (error) {
       next(error);
     }

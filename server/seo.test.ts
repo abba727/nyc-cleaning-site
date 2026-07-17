@@ -1,54 +1,112 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { render } from "../client/src/entry-server";
-import { legacyArticles } from "../client/src/content/site";
+import { legacyArchives, legacyArticles, pages, siteOrigin } from "../client/src/content/site";
+import { canonicalRedirects, getArchiveSeo, getLegacySeo, getPageSeo, SEO_DESCRIPTION_MAX_LENGTH, SEO_TITLE_MAX_LENGTH } from "../client/src/content/seo";
+import { buildRobotsText, buildSitemapXml, getPermanentRedirect } from "./seoRoutes";
 
 describe("public SEO rendering", () => {
-  it("server-renders a canonical service page with LocalBusiness and breadcrumb schema", async () => {
+  it("server-renders a canonical service page with concise metadata and organization breadcrumbs", async () => {
     const result = await render("/services/commercial-cleaning-nyc/");
     expect(result.status).toBe(200);
     expect(result.head).toContain('<link rel="canonical" href="https://www.nyccleaning.co/services/commercial-cleaning-nyc/" />');
-    expect(result.head).toContain('"@type":"LocalBusiness"');
+    expect(result.head).toContain('<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />');
+    expect(result.head).toContain('"@type":["LocalBusiness","Organization"]');
     expect(result.head).toContain('"@type":"BreadcrumbList"');
     expect(result.html).toMatch(/Commercial Cleaning/i);
   });
 
-  it("server-renders preserved articles with Article metadata", async () => {
+  it("server-renders preserved articles with complete Article metadata", async () => {
     const article = legacyArticles[0];
-    expect(article).toBeDefined();
     const result = await render(article.path);
     expect(result.status).toBe(200);
     expect(result.head).toContain('<meta property="og:type" content="article" />');
     expect(result.head).toContain('"@type":"Article"');
+    expect(result.head).toContain('"datePublished"');
+    expect(result.head).toContain('"dateModified"');
+    expect(result.head).toContain('"author":{"@id":"https://www.nyccleaning.co/#localbusiness"}');
+    expect(result.head).toContain('"publisher":{"@id":"https://www.nyccleaning.co/#localbusiness"}');
+    expect(result.head).toContain('"@type":"ImageObject"');
     expect(result.head).toContain(`https://www.nyccleaning.co${article.path}`);
     expect(result.html).toContain("NYC cleaning insights");
   });
 
-  it("serves crawler-visible blog archives and real 404 status for unknown routes", async () => {
-    expect((await render("/blog/")).status).toBe(200);
-    expect((await render("/a-route-that-does-not-exist/")).status).toBe(404);
+  it("returns distinct crawler states for archives, legal pages, admin, and missing routes", async () => {
+    const archive = await render("/2025/06/");
+    expect(archive.status).toBe(200);
+    expect(archive.head).toContain("June 2025 Cleaning Insights");
+    expect(archive.head).toContain('content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"');
+
+    const legal = await render("/service-guru-app-privacy-policy/");
+    expect(legal.status).toBe(200);
+    expect(legal.head).toContain('content="noindex, follow"');
+
+    const admin = await render("/admin/");
+    expect(admin.status).toBe(200);
+    expect(admin.head).toContain("Owner Workspace | NYC Cleaning");
+    expect(admin.head).toContain('content="noindex, follow"');
+
+    const missing = await render("/a-route-that-does-not-exist/");
+    expect(missing.status).toBe(404);
+    expect(missing.head).toContain("Page Not Found | NYC Cleaning");
+    expect(missing.head).toContain('content="noindex, follow"');
+    expect(missing.head).not.toContain("NYC Cleaning &amp; Building Maintenance Services");
+    expect(missing.head).toContain("window.__INITIAL_NOT_FOUND_PATH__=");
+    expect(missing.html).toContain("That page could not be found.");
+    expect(missing.html).not.toContain("Loading article");
+  });
+});
+
+describe("SEO metadata inventory", () => {
+  it("keeps every canonical static title unique and within the search-title limit", () => {
+    const metadata = [
+      ...pages.map(getPageSeo).filter(item => item.indexable),
+      ...legacyArticles.map(getLegacySeo),
+      ...legacyArchives.map(getLegacySeo),
+      getArchiveSeo("/category/blog/"),
+    ];
+    const titles = metadata.map(item => item.title.toLocaleLowerCase("en-US"));
+    expect(new Set(titles).size).toBe(titles.length);
+    expect(metadata.every(item => item.title.length > 10 && item.title.length <= SEO_TITLE_MAX_LENGTH)).toBe(true);
+    expect(metadata.every(item => item.description.length > 50 && item.description.length <= SEO_DESCRIPTION_MAX_LENGTH)).toBe(true);
   });
 
-  it.each([
-    ["/services/", "/cleaning-service-nyc/"],
-    ["/about/", "/about-us/"],
-    ["/privacy-policy/", "/service-guru-app-privacy-policy/"],
-    ["/commercial-cleaning-nyc/", "/services/commercial-cleaning-nyc/"],
-  ])("server-renders public alias %s with canonical destination %s", async (alias, canonicalPath) => {
-    const result = await render(alias);
-    expect(result.status).toBe(200);
-    expect(result.head).toContain(`<link rel="canonical" href="https://www.nyccleaning.co${canonicalPath}" />`);
+  it("maps every historical alias and slashless HTML route to one canonical destination", () => {
+    for (const [alias, canonical] of Object.entries(canonicalRedirects)) {
+      expect(getPermanentRedirect(alias)).toBe(canonical);
+    }
+    expect(getPermanentRedirect("/about-us")).toBe("/about-us/");
+    expect(getPermanentRedirect("/index.html")).toBe("/");
+    expect(getPermanentRedirect("/robots.txt")).toBeNull();
+    expect(getPermanentRedirect("/about-us/")).toBeNull();
+  });
+});
+
+describe("crawl controls", () => {
+  it("builds a canonical sitemap with accurate legacy dates and published CMS Insights", () => {
+    const xml = buildSitemapXml([{ path: "/cms-seo-guide/", updatedAt: new Date("2026-07-16T18:00:00.000Z") }]);
+    const locations = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(match => match[1]);
+    expect(new Set(locations).size).toBe(locations.length);
+    expect(xml).toContain(`<loc>${siteOrigin}/cms-seo-guide/</loc>`);
+    expect(xml).toContain("<lastmod>2026-07-16</lastmod>");
+    expect(xml).toContain(`<loc>${siteOrigin}/category/blog/</loc>`);
+    expect(xml).not.toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(xml).not.toContain(`<loc>${siteOrigin}/service-guru-app-privacy-policy/</loc>`);
+    expect(xml).not.toContain(`<loc>${siteOrigin}/privacy-policy/</loc>`);
   });
 
-  it("publishes a clean sitemap and restrictive crawler directives", () => {
-    const sitemap = readFileSync("client/public/sitemap.xml", "utf8");
-    const robots = readFileSync("client/public/robots.txt", "utf8");
-    expect((sitemap.match(/<url>/g) || []).length).toBeGreaterThanOrEqual(140);
-    expect(sitemap).toContain("https://www.nyccleaning.co/services/commercial-cleaning-nyc/");
-    expect(sitemap).toContain("https://www.nyccleaning.co/category/blog/");
-    expect(sitemap).not.toContain("<loc>https://www.nyccleaning.co/blog/</loc>");
-    expect(sitemap).not.toMatch(/<loc>[^<]*(?:wp-content|wp-json|\/feed\/|\?)[^<]*<\/loc>/);
-    expect(robots).toContain("Sitemap: https://www.nyccleaning.co/sitemap.xml");
+  it("serves explicit crawler exclusions and keeps the generated fallbacks aligned", () => {
+    const robots = buildRobotsText();
+    const staticRobots = readFileSync("client/public/robots.txt", "utf8");
+    const staticSitemap = readFileSync("client/public/sitemap.xml", "utf8");
+    expect(robots).toContain("Disallow: /admin/");
     expect(robots).toContain("Disallow: /api/");
+    expect(robots).toContain("Disallow: /oauth/");
+    expect(robots).toContain(`Sitemap: ${siteOrigin}/sitemap.xml`);
+    expect(staticRobots).toBe(robots);
+    expect(staticSitemap).toContain(`<loc>${siteOrigin}/services/commercial-cleaning-nyc/</loc>`);
+    expect(staticSitemap).not.toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(staticSitemap).not.toContain(`<loc>${siteOrigin}/service-guru-app-privacy-policy/</loc>`);
+    expect(staticSitemap).not.toMatch(/<loc>[^<]*(?:wp-content|wp-json|\/feed\/|\?)[^<]*<\/loc>/);
   });
 });

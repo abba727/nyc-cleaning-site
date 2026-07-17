@@ -5,7 +5,14 @@ import { createRoot, hydrateRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { readCmsSessionToken } from "./lib/cmsSessionToken";
-import "./index.css";
+import type { InitialPublishedArticle } from "./components/PublicPage";
+
+declare global {
+  interface Window {
+    __INITIAL_ARTICLE__?: InitialPublishedArticle;
+    __INITIAL_NOT_FOUND_PATH__?: string;
+  }
+}
 
 const queryClient = new QueryClient();
 
@@ -25,7 +32,7 @@ const trpcClient = trpc.createClient({
 
 const app = (
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}><App /></QueryClientProvider>
+    <QueryClientProvider client={queryClient}><App initialArticle={window.__INITIAL_ARTICLE__} initialNotFoundPath={window.__INITIAL_NOT_FOUND_PATH__} /></QueryClientProvider>
   </trpc.Provider>
 );
 

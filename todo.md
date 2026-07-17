@@ -283,3 +283,12 @@
 - [x] Validate both workflows with the configured AI services, responsive CMS checks, Vitest, TypeScript, production build, and current runtime-log review.
 - [x] Publish the title-suggestion and image-description release.
 - [x] Push the published release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.
+- [x] Re-read the full-stack and current search-engine guidance, then define the complete indexable-route audit inventory.
+- [x] Crawl every live and local indexable route plus robots.txt and sitemap.xml, recording status, redirect, canonical, title, description, headings, schema, images, and internal-link evidence.
+- [x] Audit crawler-visible rendering, canonical consistency, duplicate or missing metadata, robots directives, sitemap coverage, redirect behavior, structured data, heading hierarchy, image alt text, internal links, and CMS Insight output.
+- [x] Implement every justified technical and on-page SEO correction without changing established canonical URLs or fabricating business claims.
+- [x] Add automated regressions for route indexability, unique metadata, canonical URLs, robots/sitemap consistency, schema validity, redirects, internal links, headings, image descriptions, and crawler-visible CMS content.
+- [x] Validate all indexable routes, TypeScript, the complete Vitest suite, production build, responsive public templates, and current runtime logs after corrections.
+- [x] Produce an evidence-based SEO audit report summarizing findings, fixes, validation, and any external actions that cannot be completed in code.
+- [x] Publish the comprehensive SEO correction release.
+- [ ] Push the published SEO release and completion checkpoint to `abba727/nyc-cleaning-site` on GitHub.

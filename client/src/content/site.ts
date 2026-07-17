@@ -102,14 +102,14 @@ export const legacyContent = rawLegacyContent as LegacyContent[];
 export const legacyArticles = legacyContent.filter(item => item.kind === "article");
 export const legacyArchives = legacyContent.filter(item => item.kind === "archive");
 const articleImages = rawArticleImages as Record<string, { src: string; alt: string }>;
-export const blogArchivePaths = ["/blog/", "/category/blog/", "/category/cleaning-services/", "/category/uncategorized/"];
+export const blogArchivePaths = ["/category/blog/"];
 
 export const normalizePath = (path: string) => {
   const clean = path.split("?")[0].replace(/\/+$/, "") || "/";
   return clean === "/" ? clean : `${clean}/`;
 };
 
-const pageAliases: Record<string, string> = {
+export const pageAliases: Record<string, string> = {
   "/services/": "/cleaning-service-nyc/",
   "/about/": "/about-us/",
   "/privacy-policy/": "/service-guru-app-privacy-policy/",
@@ -133,6 +133,8 @@ export const articlesForArchive = (path: string) => {
 };
 
 export const isBlogArchivePath = (path: string) => blogArchivePaths.includes(normalizePath(path));
+
+export const isMonthlyArchivePath = (path: string) => /^\/\d{4}\/\d{2}\/$/.test(normalizePath(path));
 
 const assetByImageKey: Record<string, string> = {
   hero: brandAssets.hero,

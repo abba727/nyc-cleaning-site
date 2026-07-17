@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Generate crawler directives and the canonical public URL sitemap."""
+"""Generate static crawler fallbacks; the deployed server enriches sitemap.xml with published CMS Insights."""
 
 from __future__ import annotations
 
 import json
-from datetime import date
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -12,6 +11,15 @@ from urllib.parse import urljoin
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / "client" / "public"
 SITE_ORIGIN = "https://www.nyccleaning.co"
+ALIASES = {
+    "/services/",
+    "/about/",
+    "/privacy-policy/",
+    "/commercial-cleaning-nyc/",
+    "/blog/",
+    "/category/cleaning-services/",
+    "/category/uncategorized/",
+}
 
 
 def normalize(path: str) -> str:
@@ -22,30 +30,26 @@ def normalize(path: str) -> str:
 def main() -> None:
     site_data = json.loads((ROOT / "client" / "src" / "content" / "site-data.json").read_text())
     legacy_data = json.loads((ROOT / "client" / "src" / "content" / "legacy-articles.json").read_text())
-
-    paths = {normalize(page["path"]) for page in site_data["pages"]}
-    paths.update(normalize(item["path"]) for item in legacy_data)
-    paths.update({"/category/blog/", "/category/cleaning-services/", "/category/uncategorized/"})
+    page_paths = {normalize(page["path"]) for page in site_data["pages"] if page.get("kind") != "legal"}
+    legacy_paths = {normalize(item["path"]) for item in legacy_data}
+    legacy_dates = {normalize(item["path"]): item.get("publishedAt", "")[:10] for item in legacy_data}
+    paths = page_paths | legacy_paths | {"/category/blog/"}
 
     blocked_markers = ("/wp-admin/", "/wp-json/", "/feed/", "/author/", "/wp-content/")
     clean_paths = sorted(
         path for path in paths
-        if not any(marker in path for marker in blocked_markers)
+        if path not in ALIASES
+        and not any(marker in path for marker in blocked_markers)
         and "?" not in path
     )
 
-    lastmod = date.today().isoformat()
     url_entries = []
     for path in clean_paths:
-        priority = "1.0" if path == "/" else "0.8" if path in {"/cleaning-service-nyc/", "/contact/", "/about-us/"} else "0.6"
-        url_entries.append(
-            "  <url>\n"
-            f"    <loc>{urljoin(SITE_ORIGIN, path.lstrip('/'))}</loc>\n"
-            f"    <lastmod>{lastmod}</lastmod>\n"
-            f"    <changefreq>{'weekly' if path in {'/', '/category/blog/'} else 'monthly'}</changefreq>\n"
-            f"    <priority>{priority}</priority>\n"
-            "  </url>"
-        )
+        lines = ["  <url>", f"    <loc>{urljoin(SITE_ORIGIN, path.lstrip('/'))}</loc>"]
+        if legacy_dates.get(path):
+            lines.append(f"    <lastmod>{legacy_dates[path]}</lastmod>")
+        lines.append("  </url>")
+        url_entries.append("\n".join(lines))
 
     sitemap = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -56,9 +60,9 @@ def main() -> None:
     robots = (
         "User-agent: *\n"
         "Allow: /\n"
+        "Disallow: /admin/\n"
         "Disallow: /api/\n"
-        "Disallow: /wp-admin/\n"
-        "Disallow: /wp-json/\n\n"
+        "Disallow: /oauth/\n\n"
         f"Sitemap: {SITE_ORIGIN}/sitemap.xml\n"
     )
 
