@@ -9,28 +9,52 @@ function getGoogleStorage() {
   return googleStorage;
 }
 
-async function serveGoogleCloudObject(key: string, res: Response) {
-  const file = getGoogleStorage().bucket(ENV.gcsBucket).file(key);
+function isNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: number }).code === 404
+  );
+}
 
-  try {
-    const [metadata] = await file.getMetadata();
-    res.set({
-      "Content-Type": metadata.contentType || "application/octet-stream",
-      "Cache-Control": metadata.cacheControl || "public, max-age=3600",
-    });
-    if (metadata.etag) res.set("ETag", metadata.etag);
-    file.createReadStream()
-      .on("error", (error) => {
-        console.error("[StorageProxy] GCS stream failed:", error);
-        if (!res.headersSent) res.status(502).send("Storage proxy error");
-        else res.destroy(error);
-      })
-      .pipe(res);
-  } catch (error) {
-    const status = (error as { code?: number }).code === 404 ? 404 : 502;
-    console.error("[StorageProxy] GCS read failed:", error);
-    res.status(status).send(status === 404 ? "Asset not found" : "Storage backend error");
+function storageKeyCandidates(key: string): string[] {
+  // Existing production assets were uploaded under assets/, while application
+  // URLs retain their original /manus-storage/<filename> form. Prefer the
+  // canonical root key for newly generated assets and fall back for legacy ones.
+  return key.startsWith("assets/") ? [key] : [key, `assets/${key}`];
+}
+
+async function serveGoogleCloudObject(key: string, res: Response) {
+  const bucket = getGoogleStorage().bucket(ENV.gcsBucket);
+
+  for (const candidateKey of storageKeyCandidates(key)) {
+    const file = bucket.file(candidateKey);
+
+    try {
+      const [metadata] = await file.getMetadata();
+      res.set({
+        "Content-Type": metadata.contentType || "application/octet-stream",
+        "Cache-Control": metadata.cacheControl || "public, max-age=3600",
+      });
+      if (metadata.etag) res.set("ETag", metadata.etag);
+      file.createReadStream()
+        .on("error", (error) => {
+          console.error("[StorageProxy] GCS stream failed:", error);
+          if (!res.headersSent) res.status(502).send("Storage proxy error");
+          else res.destroy(error);
+        })
+        .pipe(res);
+      return;
+    } catch (error) {
+      if (isNotFound(error)) continue;
+      console.error("[StorageProxy] GCS read failed:", error);
+      res.status(502).send("Storage backend error");
+      return;
+    }
   }
+
+  res.status(404).send("Asset not found");
 }
 
 async function redirectToLegacyObject(key: string, res: Response) {
