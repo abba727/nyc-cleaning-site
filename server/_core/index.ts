@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -48,17 +48,22 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+  // Development mode is explicitly opt-in; all other environments use the
+  // pre-built production server so Cloud Run never resolves Vite at startup.
   if (process.env.NODE_ENV === "development") {
+    // Keep the development server outside the production bundle. In source
+    // mode this resolves to server/_core/vite.ts; production never evaluates it.
+    const developmentEntrypoint = "./vite";
+    const { setupVite } = await import(developmentEntrypoint);
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
   const preferredPort = parseInt(process.env.PORT || "3000", 10);
-  const port = process.env.NODE_ENV === "production"
-    ? preferredPort
-    : await findAvailablePort(preferredPort);
+  const port = process.env.NODE_ENV === "development"
+    ? await findAvailablePort(preferredPort)
+    : preferredPort;
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
