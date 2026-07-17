@@ -2,6 +2,7 @@ import path from "node:path";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { createPool } from "mysql2";
+import { reconcileVerifiedMigrationHistory } from "./migration-reconciliation.mjs";
 
 function required(name) {
   const value = process.env[name]?.trim();
@@ -27,10 +28,11 @@ function connectionOptions() {
 const pool = createPool(connectionOptions());
 const db = drizzle(pool);
 
+const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+
 try {
-  await migrate(db, {
-    migrationsFolder: path.resolve(process.cwd(), "drizzle"),
-  });
+  await reconcileVerifiedMigrationHistory(pool, migrationsFolder);
+  await migrate(db, { migrationsFolder });
   console.log("[migrations] complete");
 } finally {
   await pool.end();

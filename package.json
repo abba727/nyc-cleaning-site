@@ -9,8 +9,9 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
-    "test:ci": "vitest run --exclude server/resend.secret.test.ts --exclude server/seo.test.ts",
+    "test:migration-reconciliation": "node scripts/test-migration-reconciliation.mjs",
+    "test": "node scripts/test-migration-reconciliation.mjs && vitest run",
+    "test:ci": "node scripts/test-migration-reconciliation.mjs && vitest run --exclude server/resend.secret.test.ts --exclude server/seo.test.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "node scripts/run-migrations.mjs",
     "storage:migrate": "node scripts/migrate-assets-to-gcs.mjs"
