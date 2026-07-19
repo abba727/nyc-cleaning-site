@@ -1,6 +1,6 @@
 /**
  * Image generation helper using the built-in ImageService when available, with
- * a Vertex AI Imagen fallback for production Cloud Run deployments.
+ * a Vertex AI Gemini native-image fallback for production Cloud Run deployments.
  */
 import { storagePut } from "server/storage";
 import { ENV } from "./env";
@@ -9,19 +9,28 @@ import { ENV } from "./env";
 // forge images.v1 enum for GPT Image 2 (id: gpt-image-2).
 const DEFAULT_IMAGE_MODEL = "MODEL_GPT_IMAGE_2";
 const DEFAULT_IMAGE_QUALITY = "medium";
-const DEFAULT_VERTEX_IMAGE_MODEL = "imagen-4.0-generate-001";
+const DEFAULT_VERTEX_IMAGE_MODEL = "gemini-3.1-flash-image";
 
 type VertexAccessToken = {
   access_token?: string;
 };
 
-type VertexImagePrediction = {
-  bytesBase64Encoded?: string;
-  mimeType?: string;
+type VertexImagePart = {
+  inlineData?: {
+    data?: string;
+    mimeType?: string;
+  };
+};
+
+type VertexImageCandidate = {
+  content?: {
+    parts?: VertexImagePart[];
+  };
+  finishReason?: string;
 };
 
 type VertexImageResponse = {
-  predictions?: VertexImagePrediction[];
+  candidates?: VertexImageCandidate[];
 };
 
 export type GenerateImageOptions = {
@@ -68,7 +77,7 @@ const resolveVertexImageApiUrl = () => {
   const host = ENV.vertexImageLocation === "global"
     ? "https://aiplatform.googleapis.com"
     : `https://${ENV.vertexImageLocation}-aiplatform.googleapis.com`;
-  return `${host}/v1/projects/${encodeURIComponent(ENV.vertexProjectId)}/locations/${encodeURIComponent(ENV.vertexImageLocation)}/publishers/google/models/${encodeURIComponent(ENV.vertexImageModel || DEFAULT_VERTEX_IMAGE_MODEL)}:predict`;
+  return `${host}/v1/projects/${encodeURIComponent(ENV.vertexProjectId)}/locations/${encodeURIComponent(ENV.vertexImageLocation)}/publishers/google/models/${encodeURIComponent(ENV.vertexImageModel || DEFAULT_VERTEX_IMAGE_MODEL)}:generateContent`;
 };
 
 const saveGeneratedImage = async (base64Data: string, mimeType: string) => {
@@ -137,6 +146,7 @@ const generateWithVertex = async (
   }
 
   const accessToken = await getVertexAccessToken();
+  const model = ENV.vertexImageModel || DEFAULT_VERTEX_IMAGE_MODEL;
   const response = await fetch(resolveVertexImageApiUrl(), {
     method: "POST",
     headers: {
@@ -145,11 +155,13 @@ const generateWithVertex = async (
       authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify({
-      instances: [{ prompt: options.prompt }],
-      parameters: {
-        sampleCount: 1,
-        aspectRatio: "3:2",
-        outputOptions: { mimeType: "image/png" },
+      contents: [{
+        role: "user",
+        parts: [{ text: options.prompt }],
+      }],
+      generationConfig: {
+        responseModalities: ["IMAGE"],
+        imageConfig: { aspectRatio: "3:2" },
       },
     }),
   });
@@ -157,19 +169,27 @@ const generateWithVertex = async (
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
     throw new Error(
-      `Vertex AI image generation failed (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
+      `Vertex AI image generation failed for ${model} in ${ENV.vertexImageLocation} (${response.status} ${response.statusText})${detail ? `: ${detail}` : ""}`
     );
   }
 
   const result = (await response.json()) as VertexImageResponse;
-  const prediction = result.predictions?.find(item => item.bytesBase64Encoded);
-  if (!prediction?.bytesBase64Encoded) {
-    throw new Error("Vertex AI returned no usable generated image.");
+  const imagePart = result.candidates
+    ?.flatMap(candidate => candidate.content?.parts ?? [])
+    .find(part => part.inlineData?.data);
+  if (!imagePart?.inlineData?.data) {
+    const finishReasons = result.candidates
+      ?.map(candidate => candidate.finishReason)
+      .filter((reason): reason is string => Boolean(reason));
+    const reasonDetail = finishReasons?.length
+      ? ` (finish reason: ${finishReasons.join(", ")})`
+      : "";
+    throw new Error(`Vertex AI returned no usable generated image${reasonDetail}.`);
   }
 
   const { key, url } = await saveGeneratedImage(
-    prediction.bytesBase64Encoded,
-    prediction.mimeType || "image/png"
+    imagePart.inlineData.data,
+    imagePart.inlineData.mimeType || "image/png"
   );
   return { key, url };
 };
@@ -202,7 +222,7 @@ export type ListImageModelsResponse = {
 
 /**
  * List the image models the current runtime can use. In production without a
- * Forge key, the Vertex fallback exposes its configured Imagen model.
+ * Forge key, the Vertex fallback exposes its configured Gemini image model.
  */
 export async function listImageModels(): Promise<ListImageModelsResponse> {
   if (!hasForgeImageConfig()) {

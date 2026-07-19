@@ -29,11 +29,41 @@
   --white: #ffffff;
   --radius: 0.35rem;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Shared semantic surfaces used by the CMS component library. */
+  --background: #f3f7f6;
+  --foreground: #172323;
+  --card: #ffffff;
+  --card-foreground: #172323;
+  --popover: #ffffff;
+  --popover-foreground: #172323;
+  --primary: #006b5b;
+  --primary-foreground: #ffffff;
+  --secondary: #e8f4f1;
+  --secondary-foreground: #173d36;
+  --muted-background: #edf3f1;
+  --muted-foreground: #61706d;
+  --accent: #dff4ee;
+  --accent-foreground: #004e43;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #d6e1de;
+  --input: #d6e1de;
+  --ring: #0f766e;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #172323;
+  --sidebar-primary: #006b5b;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8f4f1;
+  --sidebar-accent-foreground: #173d36;
+  --sidebar-border: #d6e1de;
+  --sidebar-ring: #0f766e;
   color-scheme: light;
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; overflow-x: clip; }
+body, #root { max-width: 100%; overflow-x: clip; }
 body { margin: 0; background: var(--paper); color: var(--ink); font-family: "Source Sans 3", system-ui, sans-serif; font-size: 17px; line-height: 1.65; }
 body, button, input, select, textarea { font-family: "Source Sans 3", system-ui, sans-serif; }
 img { display: block; max-width: 100%; }
