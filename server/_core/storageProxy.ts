@@ -4,6 +4,8 @@ import { ENV } from "./env";
 
 let googleStorage: Storage | null = null;
 
+const VERSIONED_MEDIA_PATTERN = /[_-][a-f0-9]{8,}(?:[-_]\d+w)?\.(?:avif|gif|ico|jpe?g|png|svg|webp)$/i;
+
 function getGoogleStorage() {
   googleStorage ??= new Storage();
   return googleStorage;
@@ -25,6 +27,16 @@ function storageKeyCandidates(key: string): string[] {
   return key.startsWith("assets/") ? [key] : [key, `assets/${key}`];
 }
 
+function cacheControlForAsset(key: string, metadataCacheControl?: string | null) {
+  // Asset filenames contain a content/version hash. A deploy that changes an
+  // image uses a new filename, which makes long-lived browser caching safe.
+  if (VERSIONED_MEDIA_PATTERN.test(key)) {
+    return "public, max-age=31536000, immutable";
+  }
+
+  return metadataCacheControl || "public, max-age=3600";
+}
+
 async function serveGoogleCloudObject(key: string, res: Response) {
   const bucket = getGoogleStorage().bucket(ENV.gcsBucket);
 
@@ -35,7 +47,7 @@ async function serveGoogleCloudObject(key: string, res: Response) {
       const [metadata] = await file.getMetadata();
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",
-        "Cache-Control": metadata.cacheControl || "public, max-age=3600",
+        "Cache-Control": cacheControlForAsset(candidateKey, metadata.cacheControl),
       });
       if (metadata.etag) res.set("ETag", metadata.etag);
       file.createReadStream()

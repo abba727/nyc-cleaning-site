@@ -65,6 +65,51 @@ function displayUsPhone(value: string) {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+export async function submitPublicInquiry(rawInput: unknown) {
+  const input = inquiryInput.parse(rawInput);
+  if (input.website) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid submission" });
+  const since = new Date(Date.now() - 10 * 60 * 1000);
+  const recentCount = await countRecentInquiriesByEmail(input.email, since);
+  if (recentCount >= 3) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait a few minutes before sending another request." });
+
+  const phone = normalizeUsPhone(input.phone);
+  const inquiryId = await createInquiry({
+    inquiryType: input.inquiryType,
+    name: input.name,
+    email: input.email,
+    phone,
+    serviceType: input.serviceType,
+    message: input.message,
+    sourcePath: input.sourcePath || "/contact/",
+    status: "new",
+    notificationStatus: "pending",
+  });
+
+  let notificationSent = false;
+  try {
+    const delivery = await sendInquiryNotification({
+      inquiryId,
+      inquiryType: input.inquiryType,
+      name: input.name,
+      email: input.email,
+      phone: displayUsPhone(phone),
+      serviceType: input.serviceType,
+      message: input.message,
+      sourcePath: input.sourcePath || "/contact/",
+    });
+    notificationSent = Boolean(delivery?.id);
+  } catch (error) {
+    console.error(`[Inquiry] Resend notification failed for ${inquiryId}`, error);
+  }
+
+  try {
+    await updateInquiryNotificationStatus(inquiryId, notificationSent ? "sent" : "failed");
+  } catch (error) {
+    console.error(`[Inquiry] Could not update notification status for ${inquiryId}`, error);
+  }
+  return { success: true, inquiryId, notificationSent } as const;
+}
+
 const articleBlockInput = z.object({
   type: z.enum(["h2", "h3", "p", "li"]),
   text: z.string().trim().min(1).max(10000),
@@ -344,49 +389,7 @@ export const appRouter = router({
     }),
   }),
   inquiry: router({
-    submit: publicProcedure.input(inquiryInput).mutation(async ({ input }) => {
-      if (input.website) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid submission" });
-      const since = new Date(Date.now() - 10 * 60 * 1000);
-      const recentCount = await countRecentInquiriesByEmail(input.email, since);
-      if (recentCount >= 3) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Please wait a few minutes before sending another request." });
-
-      const phone = normalizeUsPhone(input.phone);
-      const inquiryId = await createInquiry({
-        inquiryType: input.inquiryType,
-        name: input.name,
-        email: input.email,
-        phone,
-        serviceType: input.serviceType,
-        message: input.message,
-        sourcePath: input.sourcePath || "/contact/",
-        status: "new",
-        notificationStatus: "pending",
-      });
-
-      let notificationSent = false;
-      try {
-        const delivery = await sendInquiryNotification({
-          inquiryId,
-          inquiryType: input.inquiryType,
-          name: input.name,
-          email: input.email,
-          phone: displayUsPhone(phone),
-          serviceType: input.serviceType,
-          message: input.message,
-          sourcePath: input.sourcePath || "/contact/",
-        });
-        notificationSent = Boolean(delivery?.id);
-      } catch (error) {
-        console.error(`[Inquiry] Resend notification failed for ${inquiryId}`, error);
-      }
-
-      try {
-        await updateInquiryNotificationStatus(inquiryId, notificationSent ? "sent" : "failed");
-      } catch (error) {
-        console.error(`[Inquiry] Could not update notification status for ${inquiryId}`, error);
-      }
-      return { success: true, inquiryId, notificationSent } as const;
-    }),
+    submit: publicProcedure.input(inquiryInput).mutation(async ({ input }) => submitPublicInquiry(input)),
     list: adminProcedure.query(() => listInquiries()),
     detail: adminProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ input }) => {
       const record = await getInquiryById(input.id);

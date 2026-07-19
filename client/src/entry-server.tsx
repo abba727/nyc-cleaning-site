@@ -7,7 +7,10 @@ import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
 import App from "./App";
 import { brandAssets } from "./content/assets";
-import { company, getArticleImage, getLegacyByPath, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
+import { getArticleImage, getLegacyByPath, legacyArticleImages, legacyContent } from "./content/legacy-content";
+import { responsiveMedia } from "./content/responsive-media";
+import { company, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
+import type { LegacyContentPayload } from "./contexts/LegacyContentContext";
 import { getPublishedArticleByPath } from "../../server/db";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
@@ -48,13 +51,16 @@ export async function render(url: string) {
       : isSyntheticArchive
         ? { path: pathname, title: "Cleaning Insights | NYC Cleaning and Maintenance", description: "Practical cleaning and property-maintenance guidance from NYC Cleaning and Maintenance.", h1: "Cleaning and Property Maintenance Insights", kind: "core" }
         : page;
+  const legacyPayload: LegacyContentPayload | null = matchedLegacy || isSyntheticArchive
+    ? { content: legacyContent, images: legacyArticleImages }
+    : null;
   const queryClient = new QueryClient();
   const trpcClient = trpc.createClient({ links: [httpBatchLink({ url: `${siteOrigin}/api/trpc`, transformer: superjson })] });
   const html = renderToString(
     <React.StrictMode>
       <Router ssrPath={pathname}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}><App /></QueryClientProvider>
+          <QueryClientProvider client={queryClient}><App legacyContent={legacyPayload} /></QueryClientProvider>
         </trpc.Provider>
       </Router>
     </React.StrictMode>
@@ -87,11 +93,21 @@ export async function render(url: string) {
     ],
   };
 
+  const homeHeroPreload = pathname === "/"
+    ? `<link rel="preload" as="image" type="image/avif" href="/manus-storage/responsive-media/nyc-cleaning-hero-v2_40f4e363-800w.avif" imagesrcset="${responsiveMedia.hero.avifSrcSet}" imagesizes="${responsiveMedia.hero.sizes}" fetchpriority="high" />`
+    : "";
+
+  const legacyHydration = legacyPayload
+    ? `<script>window.__NYC_LEGACY_CONTENT__=${safeJson(legacyPayload)};</script>`
+    : "";
+
   const head = [
     `<title>${escapeHtml(seo.title)}</title>`,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`,
     `<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />`,
     `<link rel="canonical" href="${canonical}" />`,
+    homeHeroPreload,
+    legacyHydration,
     `<meta property="og:locale" content="en_US" />`,
     `<meta property="og:type" content="${isArticle || seo.kind === "blog" ? "article" : "website"}" />`,
     `<meta property="og:site_name" content="${escapeHtml(company.name)}" />`,

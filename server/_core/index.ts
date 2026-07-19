@@ -2,10 +2,11 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { TRPCError } from "@trpc/server";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { appRouter } from "../routers";
+import { appRouter, submitPublicInquiry } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
 
@@ -38,6 +39,22 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.post("/api/inquiry", async (req, res) => {
+    try {
+      const result = await submitPublicInquiry(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      const isPublicError = error instanceof TRPCError;
+      const code = isPublicError ? error.code : "BAD_REQUEST";
+      const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "BAD_REQUEST" ? 400 : 500;
+      const message = isPublicError && code !== "INTERNAL_SERVER_ERROR"
+        ? error.message
+        : code === "BAD_REQUEST"
+          ? "Please check the required fields and try again."
+          : "We couldn’t send your request right now. Please try again shortly.";
+      res.status(status).json({ error: code, message });
+    }
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // tRPC API

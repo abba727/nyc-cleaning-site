@@ -74,6 +74,20 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
  * - Files: browserConsole.log, networkRequests.log, sessionReplay.log
  * - Auto-trimmed when exceeding 1MB (keeps newest entries)
  */
+function analyticsShellPlugin(): Plugin {
+  return {
+    name: "nyc-cleaning-analytics-shell",
+    transformIndexHtml(html) {
+      const endpoint = process.env.VITE_ANALYTICS_ENDPOINT?.replace(/\/$/, "");
+      const websiteId = process.env.VITE_ANALYTICS_WEBSITE_ID;
+      const analytics = endpoint && websiteId
+        ? `<script defer src="${endpoint}/umami" data-website-id="${websiteId}"></script>`
+        : "";
+      return html.replace("<!--analytics-script-->", analytics);
+    },
+  };
+}
+
 function vitePluginManusDebugCollector(): Plugin {
   return {
     name: "manus-debug-collector",
@@ -150,9 +164,18 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+export default defineConfig(({ command }) => {
+  const isProductionBuild = command === "build";
+  const plugins = [
+    react(),
+    tailwindcss(),
+    analyticsShellPlugin(),
+    ...(!isProductionBuild
+      ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()]
+      : []),
+  ];
 
-export default defineConfig({
+  return {
   plugins,
   resolve: {
     alias: {
@@ -184,4 +207,5 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  };
 });

@@ -24,6 +24,7 @@ import { getDashboardAccessState } from "@/lib/adminAccess";
 import { ArrowUpRight, FileText, Inbox, LogOut, PanelLeft, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
+import "../admin.css";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
