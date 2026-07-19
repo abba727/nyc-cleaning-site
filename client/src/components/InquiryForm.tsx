@@ -1,6 +1,5 @@
 import { FormEvent, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
-import { trpc } from "@/lib/trpc";
 import { company, services, serviceName } from "@/content/site";
 
 type InquiryFormProps = { compact?: boolean; sourcePath: string; heading?: string };
@@ -29,15 +28,9 @@ export function InquiryForm({ compact = false, sourcePath, heading = "Request a 
   const [phone, setPhone] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
-  const mutation = trpc.inquiry.submit.useMutation({
-    onSuccess: () => setSuccess(true),
-    onError: error => {
-      const code = error.data?.code;
-      setFormError(code === "TOO_MANY_REQUESTS" ? "You’ve sent several requests recently. Please wait a few minutes and try again." : `We couldn’t send your request right now. Please review the highlighted fields or call ${company.phoneDisplay} for immediate help.`);
-    },
-  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setFormError("");
     const form = new FormData(event.currentTarget);
@@ -53,7 +46,26 @@ export function InquiryForm({ compact = false, sourcePath, heading = "Request a 
       setFormError("Please correct the highlighted fields and submit again.");
       return;
     }
-    mutation.mutate({ inquiryType: "quote", ...values, name: values.name.trim(), email: values.email.trim(), message: values.message.trim(), sourcePath, website: String(form.get("website") || "") });
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/inquiry", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ inquiryType: "quote", ...values, name: values.name.trim(), email: values.email.trim(), message: values.message.trim(), sourcePath, website: String(form.get("website") || "") }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: string; message?: string } | null;
+        setFormError(payload?.error === "TOO_MANY_REQUESTS"
+          ? "You’ve sent several requests recently. Please wait a few minutes and try again."
+          : payload?.message || `We couldn’t send your request right now. Please review the highlighted fields or call ${company.phoneDisplay} for immediate help.`);
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setFormError(`We couldn’t send your request right now. Please review the highlighted fields or call ${company.phoneDisplay} for immediate help.`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (success) return <div className="form-success" role="status"><CheckCircle2 aria-hidden="true" /><h2>Thank you. Your request is in.</h2><p>Our team will review your information and follow up using the contact details you provided.</p></div>;
@@ -71,7 +83,7 @@ export function InquiryForm({ compact = false, sourcePath, heading = "Request a 
         <label className="honeypot" aria-hidden="true"><span>Website</span><input name="website" tabIndex={-1} autoComplete="off" /></label>
       </div>
       {formError ? <p className="form-error" role="alert">{formError}</p> : null}
-      <button type="submit" className="button button-gold" disabled={mutation.isPending}>{mutation.isPending ? <><Loader2 className="spin" size={18} /> Sending…</> : "Request My Quote"}</button>
+      <button type="submit" className="button button-gold" disabled={isSubmitting}>{isSubmitting ? <><Loader2 className="spin" size={18} /> Sending…</> : "Request My Quote"}</button>
       <p className="form-note">By submitting, you agree that NYC Cleaning and Maintenance may contact you about this request.</p>
     </form>
   );

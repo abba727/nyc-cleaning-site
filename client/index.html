@@ -3,9 +3,7 @@
 
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/manus-storage/nyc-cleaning-logo_aabc7372.webp" type="image/webp" />
     <style id="critical-shell">
       :root { color-scheme: light; }
@@ -13,9 +11,8 @@
       body { margin: 0; color: #16212b; font-family: "Source Sans 3", system-ui, sans-serif; }
       #root { min-height: 100vh; }
     </style>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&amp;family=Source+Sans+3:wght@400;500;600;700&amp;display=swap" rel="stylesheet" />
+    <link rel="preload" href="/fonts/source-sans-3-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/archivo-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/src/index.css" />
     <!--app-head-->
   </head>
@@ -23,10 +20,7 @@
   <body>
     <div id="root"><!--app-html--></div>
     <script type="module" src="/src/entry-client.tsx"></script>
-    <script
-      defer
-      src="%VITE_ANALYTICS_ENDPOINT%/umami"
-      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"></script>
+    <!--analytics-script-->
   </body>
 
 </html>

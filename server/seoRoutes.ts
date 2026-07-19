@@ -1,5 +1,6 @@
 import type { Express, Request } from "express";
-import { legacyArchives, legacyArticles, normalizePath, pages, siteOrigin } from "../client/src/content/site";
+import { normalizePath, pages, siteOrigin } from "../client/src/content/site";
+import { legacyArchives, legacyArticles } from "../client/src/content/legacy-content";
 import { getCanonicalRedirect, getPageSeo } from "../client/src/content/seo";
 import { listPublishedArticles } from "./db";
 

@@ -26,7 +26,7 @@ export function SiteHeader() {
       </div>
       <div className="container nav-shell">
         <Link href="/" className="brand-link" aria-label="NYC Cleaning and Maintenance home">
-          <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" className="brand-logo" />
+          <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" className="brand-logo" width={508} height={224} />
         </Link>
 
         <nav className="desktop-nav" aria-label="Primary navigation">

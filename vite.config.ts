@@ -74,6 +74,20 @@ function writeToLogFile(source: LogSource, entries: unknown[]) {
  * - Files: browserConsole.log, networkRequests.log, sessionReplay.log
  * - Auto-trimmed when exceeding 1MB (keeps newest entries)
  */
+function analyticsShellPlugin(): Plugin {
+  return {
+    name: "nyc-cleaning-analytics-shell",
+    transformIndexHtml(html) {
+      const endpoint = process.env.VITE_ANALYTICS_ENDPOINT?.replace(/\/$/, "");
+      const websiteId = process.env.VITE_ANALYTICS_WEBSITE_ID;
+      const analytics = endpoint && websiteId
+        ? `<script defer src="${endpoint}/umami" data-website-id="${websiteId}"></script>`
+        : "";
+      return html.replace("<!--analytics-script-->", analytics);
+    },
+  };
+}
+
 function vitePluginManusDebugCollector(): Plugin {
   return {
     name: "manus-debug-collector",
@@ -150,14 +164,19 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  plugins: [
+export default defineConfig(({ command }) => {
+  const isProductionBuild = command === "build";
+  const plugins = [
     react(),
     tailwindcss(),
-    ...(mode === "development" ? [jsxLocPlugin()] : []),
-    vitePluginManusRuntime(),
-    vitePluginManusDebugCollector(),
-  ],
+    analyticsShellPlugin(),
+    ...(!isProductionBuild
+      ? [jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()]
+      : []),
+  ];
+
+  return {
+  plugins,
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -171,7 +190,6 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    sourcemap: true,
   },
   server: {
     host: true,
@@ -189,4 +207,5 @@ export default defineConfig(({ mode }) => ({
       deny: ["**/.*"],
     },
   },
-}));
+  };
+});

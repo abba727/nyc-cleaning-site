@@ -217,9 +217,15 @@ const resolveApiUrl = () =>
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
     : "https://forge.manus.im/v1/chat/completions";
 
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+const hasVertexConfig = () => Boolean(
+  ENV.vertexProjectId && ENV.vertexLocation && ENV.vertexModel
+);
+
+const assertAiConfiguration = () => {
+  if (!ENV.forgeApiKey && !hasVertexConfig()) {
+    throw new Error(
+      "Article generation is not configured. Configure BUILT_IN_FORGE_API_KEY or Vertex AI runtime settings."
+    );
   }
 };
 
@@ -265,6 +271,144 @@ const normalizeResponseFormat = ({
       schema: schema.schema,
       ...(typeof schema.strict === "boolean" ? { strict: schema.strict } : {}),
     },
+  };
+};
+
+type VertexAccessToken = {
+  access_token?: string;
+};
+
+type VertexGenerateResponse = {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
+    finishReason?: string;
+  }>;
+  usageMetadata?: {
+    promptTokenCount?: number;
+    candidatesTokenCount?: number;
+    totalTokenCount?: number;
+  };
+};
+
+const vertexText = (message: Message) => ensureArray(message.content)
+  .map(part => {
+    if (typeof part === "string") return part;
+    if (part.type === "text") return part.text;
+    throw new Error("Vertex AI fallback supports text-only article generation.");
+  })
+  .join("\n");
+
+const getVertexAccessToken = async (): Promise<string> => {
+  const response = await fetch(
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+    { headers: { "Metadata-Flavor": "Google" } }
+  );
+  if (!response.ok) {
+    throw new Error("Vertex AI could not obtain the Cloud Run service-identity token.");
+  }
+  const token = (await response.json()) as VertexAccessToken;
+  if (!token.access_token) {
+    throw new Error("Vertex AI returned no Cloud Run service-identity token.");
+  }
+  return token.access_token;
+};
+
+const resolveVertexApiUrl = () => {
+  const host = ENV.vertexLocation === "global"
+    ? "https://aiplatform.googleapis.com"
+    : `https://${ENV.vertexLocation}-aiplatform.googleapis.com`;
+  return `${host}/v1/projects/${encodeURIComponent(ENV.vertexProjectId)}/locations/${encodeURIComponent(ENV.vertexLocation)}/publishers/google/models/${encodeURIComponent(ENV.vertexModel)}:generateContent`;
+};
+
+const invokeVertexLLM = async (params: InvokeParams): Promise<InvokeResult> => {
+  if (!hasVertexConfig()) {
+    throw new Error("Vertex AI runtime settings are not configured.");
+  }
+
+  const systemInstruction = params.messages
+    .filter(message => message.role === "system")
+    .map(vertexText)
+    .filter(Boolean)
+    .join("\n\n");
+  const contents = params.messages
+    .filter(message => message.role !== "system")
+    .map(message => ({
+      role: message.role === "assistant" ? "model" : "user",
+      parts: [{ text: vertexText(message) }],
+    }));
+
+  if (contents.length === 0) {
+    throw new Error("Vertex AI requires at least one non-system message.");
+  }
+
+  const normalizedResponseFormat = normalizeResponseFormat(params);
+  const structuredOutput = normalizedResponseFormat?.type === "json_schema"
+    || normalizedResponseFormat?.type === "json_object";
+  const generationConfig: Record<string, unknown> = {
+    maxOutputTokens: params.max_tokens ?? params.maxTokens ?? (structuredOutput ? 2048 : 1024),
+  };
+  if (structuredOutput && ENV.vertexModel.startsWith("gemini-2.5")) {
+    // The CMS metadata task is deterministic formatting, not multi-step reasoning.
+    // Disabling returned thinking preserves the full output budget for valid JSON.
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
+  if (normalizedResponseFormat?.type === "json_schema") {
+    generationConfig.responseMimeType = "application/json";
+    generationConfig.responseSchema = normalizedResponseFormat.json_schema.schema;
+  } else if (normalizedResponseFormat?.type === "json_object") {
+    generationConfig.responseMimeType = "application/json";
+  }
+
+  const accessToken = await getVertexAccessToken();
+  const response = await fetchWithBackoff(resolveVertexApiUrl(), {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      ...(systemInstruction
+        ? { systemInstruction: { parts: [{ text: systemInstruction }] } }
+        : {}),
+      contents,
+      generationConfig,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Vertex AI invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+    );
+  }
+
+  const result = (await response.json()) as VertexGenerateResponse;
+  const candidate = result.candidates?.[0];
+  const content = candidate?.content?.parts
+    ?.filter(part => !part.thought)
+    .map(part => part.text ?? "")
+    .join("")
+    .trim();
+  if (!content) {
+    throw new Error("Vertex AI returned no usable article content.");
+  }
+
+  return {
+    id: `vertex-${Date.now()}`,
+    created: Math.floor(Date.now() / 1000),
+    model: ENV.vertexModel,
+    choices: [{
+      index: 0,
+      message: { role: "assistant", content },
+      finish_reason: candidate?.finishReason ?? "STOP",
+    }],
+    usage: result.usageMetadata
+      ? {
+          prompt_tokens: result.usageMetadata.promptTokenCount ?? 0,
+          completion_tokens: result.usageMetadata.candidatesTokenCount ?? 0,
+          total_tokens: result.usageMetadata.totalTokenCount ?? 0,
+        }
+      : undefined,
   };
 };
 
@@ -340,7 +484,10 @@ const fetchWithBackoff = async (
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  assertAiConfiguration();
+  if (!ENV.forgeApiKey) {
+    return invokeVertexLLM(params);
+  }
 
   const {
     messages,
@@ -433,7 +580,18 @@ export type ModelsResponse = {
 };
 
 export async function listLLMModels(): Promise<ModelsResponse> {
-  assertApiKey();
+  assertAiConfiguration();
+  if (!ENV.forgeApiKey) {
+    return {
+      object: "list",
+      data: [{
+        id: ENV.vertexModel,
+        object: "model",
+        created: 0,
+        owned_by: "vertex-ai",
+      }],
+    };
+  }
 
   const url = ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
     ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/models`

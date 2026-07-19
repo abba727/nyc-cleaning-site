@@ -1,6 +1,4 @@
 import rawSiteData from "./site-data.json";
-import rawLegacyContent from "./legacy-articles.json";
-import rawArticleImages from "./article-images.json";
 import { brandAssets } from "./assets";
 import { getServiceContent } from "./service-content";
 
@@ -98,18 +96,14 @@ export const serviceGroups = [
     .map(path => services.find(service => service.path === path))
     .filter((service): service is SitePage => Boolean(service)),
 }));
-export const legacyContent = rawLegacyContent as LegacyContent[];
-export const legacyArticles = legacyContent.filter(item => item.kind === "article");
-export const legacyArchives = legacyContent.filter(item => item.kind === "archive");
-const articleImages = rawArticleImages as Record<string, { src: string; alt: string }>;
-export const blogArchivePaths = ["/category/blog/"];
+export const blogArchivePaths = ["/blog/", "/category/blog/", "/category/cleaning-services/", "/category/uncategorized/"];
 
 export const normalizePath = (path: string) => {
   const clean = path.split("?")[0].replace(/\/+$/, "") || "/";
   return clean === "/" ? clean : `${clean}/`;
 };
 
-export const pageAliases: Record<string, string> = {
+const pageAliases: Record<string, string> = {
   "/services/": "/cleaning-service-nyc/",
   "/about/": "/about-us/",
   "/privacy-policy/": "/service-guru-app-privacy-policy/",
@@ -121,20 +115,7 @@ export const getPageByPath = (path: string) => {
   const canonicalPath = pageAliases[normalized] || normalized;
   return pages.find(page => normalizePath(page.path) === canonicalPath);
 };
-export const getLegacyByPath = (path: string) => legacyContent.find(item => normalizePath(item.path) === normalizePath(path));
-export const getArticleImage = (content: LegacyContent) => articleImages[normalizePath(content.path)]?.src || brandAssets.hero;
-export const getArticleImageAlt = (content: LegacyContent) => articleImages[normalizePath(content.path)]?.alt || `Editorial image for ${content.title}`;
-
-export const articlesForArchive = (path: string) => {
-  const match = normalizePath(path).match(/^\/(\d{4})\/(\d{2})\/$/);
-  if (!match) return legacyArticles;
-  const [, year, month] = match;
-  return legacyArticles.filter(article => article.publishedAt.startsWith(`${year}-${month}-`));
-};
-
 export const isBlogArchivePath = (path: string) => blogArchivePaths.includes(normalizePath(path));
-
-export const isMonthlyArchivePath = (path: string) => /^\/\d{4}\/\d{2}\/$/.test(normalizePath(path));
 
 const assetByImageKey: Record<string, string> = {
   hero: brandAssets.hero,

@@ -2,12 +2,13 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import { TRPCError } from "@trpc/server";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { appRouter } from "../routers";
+import { appRouter, submitPublicInquiry } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { registerSeoRoutes } from "../seoRoutes";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -32,10 +33,30 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  app.set("trust proxy", 1);
+  app.get("/healthz", (_req, res) => {
+    res.status(200).json({ status: "ok" });
+  });
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerSeoRoutes(app);
+  app.post("/api/inquiry", async (req, res) => {
+    try {
+      const result = await submitPublicInquiry(req.body);
+      res.status(201).json(result);
+    } catch (error) {
+      const isPublicError = error instanceof TRPCError;
+      const code = isPublicError ? error.code : "BAD_REQUEST";
+      const status = code === "TOO_MANY_REQUESTS" ? 429 : code === "BAD_REQUEST" ? 400 : 500;
+      const message = isPublicError && code !== "INTERNAL_SERVER_ERROR"
+        ? error.message
+        : code === "BAD_REQUEST"
+          ? "Please check the required fields and try again."
+          : "We couldn’t send your request right now. Please try again shortly.";
+      res.status(status).json({ error: code, message });
+    }
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // tRPC API
@@ -46,22 +67,29 @@ async function startServer() {
       createContext,
     })
   );
-  // development mode uses Vite, production mode uses static files
+  // Development mode is explicitly opt-in; all other environments use the
+  // pre-built production server so Cloud Run never resolves Vite at startup.
   if (process.env.NODE_ENV === "development") {
+    // Keep the development server outside the production bundle. In source
+    // mode this resolves to server/_core/vite.ts; production never evaluates it.
+    const developmentEntrypoint = "./vite";
+    const { setupVite } = await import(developmentEntrypoint);
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  const preferredPort = parseInt(process.env.PORT || "3000", 10);
+  const port = process.env.NODE_ENV === "development"
+    ? await findAvailablePort(preferredPort)
+    : preferredPort;
 
   if (port !== preferredPort) {
     console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
   }
 
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+  server.listen(port, "0.0.0.0", () => {
+    console.log(`Server running on port ${port}`);
   });
 }
 
