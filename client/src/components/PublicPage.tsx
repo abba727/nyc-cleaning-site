@@ -1,14 +1,13 @@
-import { lazy, Suspense, type ImgHTMLAttributes, useEffect } from "react";
+import { type ImgHTMLAttributes, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
+import LegacyContentPage from "./LegacyContentPage";
 import { brandAssets } from "@/content/assets";
 import { getResponsiveMedia } from "@/content/responsive-media";
-import { company, featuredServices, getPageByPath, getPageImage, homepageServices, normalizePath, pageParagraphs, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
+import { company, featuredServices, getPageByPath, getPageImage, homepageServices, isBlogArchivePath, normalizePath, pageParagraphs, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
 import { getServiceContent } from "@/content/service-content";
 import { getPageSeo } from "@/content/seo";
-
-const LegacyContentPage = lazy(() => import("./LegacyContentPage"));
 
 export type InitialPublishedArticle = {
   path: string;
@@ -127,11 +126,12 @@ function ServiceDetailPage({ page }: { page: SitePage }) {
 }
 
 function LegacyRoute({ path, initialArticle, initialNotFoundPath }: { path: string; initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null }) {
-  return <Suspense fallback={<section className="section not-found"><div className="container"><p className="eyebrow">Loading</p><h1>Opening article…</h1></div></section>}><LegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} /></Suspense>;
+  return <LegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
 }
 
 export function PublicPage({ initialArticle, initialNotFoundPath }: { initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null } = {}) {
   const [location] = useLocation();
+  if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
   const page = getPageByPath(location);
   if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
   return <><ClientHead page={page} />{page.path === "/" ? <HomePage page={page} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;

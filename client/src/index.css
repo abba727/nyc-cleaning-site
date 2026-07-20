@@ -298,15 +298,27 @@ p { margin: 0 0 1.2rem; }
 .article-content p, .article-content li { color: #455460; }
 .article-list { display: grid; gap: 0.6rem; padding-left: 1.35rem; }
 .article-list li::marker { color: var(--gold-dark); }
-.article-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.3rem; }
-.article-card { display: flex; min-height: 100%; flex-direction: column; overflow: hidden; background: var(--white); box-shadow: 0 16px 42px rgb(11 31 51 / 0.08); }
-.article-card-image { display: block; width: 100%; overflow: hidden; background: #dbe4e8; aspect-ratio: 3 / 2; }
-.article-card-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 260ms var(--ease-out); }
-.article-card-image:hover img { transform: scale(1.025); }
-.article-card-body { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: flex-start; padding: 1.5rem; }
-.article-card h2 { margin-bottom: 0.85rem; color: var(--navy); font-size: clamp(1.35rem, 2.3vw, 1.85rem); }
-.article-card-body > p:not(.eyebrow) { color: var(--muted); }
-.article-card .text-link { margin-top: auto; }
+.insights-hero { position: relative; overflow: hidden; }
+.insights-hero::after { position: absolute; right: clamp(-7rem, -5vw, -2rem); bottom: clamp(-11rem, -9vw, -4rem); width: clamp(16rem, 29vw, 28rem); height: clamp(16rem, 29vw, 28rem); border: 1px solid rgb(121 222 214 / 0.26); border-radius: 50%; content: ""; pointer-events: none; }
+.insights-hero .interior-hero-grid { position: relative; z-index: 1; }
+.insights-count { display: inline-flex; margin-top: 1.5rem; border: 1px solid rgb(121 222 214 / 0.45); padding: 0.5rem 0.75rem; color: #b9f1ec; font-family: "Archivo", sans-serif; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.insights-archive-section { padding-top: clamp(4rem, 7vw, 6.5rem); }
+.article-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(1.25rem, 2.4vw, 2rem); }
+.article-card { display: flex; min-height: 100%; flex-direction: column; overflow: hidden; border: 1px solid #dce5e8; border-radius: 0.45rem; background: var(--white); box-shadow: 0 16px 42px rgb(11 31 51 / 0.08); transition: transform 220ms var(--ease-out), box-shadow 220ms var(--ease-out), border-color 220ms var(--ease-out); }
+.article-card:hover, .article-card:focus-within { border-color: rgb(23 135 126 / 0.45); box-shadow: 0 24px 54px rgb(11 31 51 / 0.15); transform: translateY(-5px); }
+.article-card-image { position: relative; display: block; width: 100%; overflow: hidden; background: #dbe4e8; aspect-ratio: 3 / 2; }
+.article-card-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 360ms var(--ease-out); }
+.article-card-image-shade { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 54%, rgb(7 23 37 / 0.22)); opacity: 0; transition: opacity 220ms var(--ease-out); }
+.article-card-image:hover img, .article-card:focus-within .article-card-image img { transform: scale(1.05); }
+.article-card-image:hover .article-card-image-shade, .article-card:focus-within .article-card-image-shade { opacity: 1; }
+.article-card-body { display: flex; min-height: 0; flex: 1; flex-direction: column; align-items: flex-start; padding: clamp(1.25rem, 2.2vw, 1.6rem); }
+.article-card-meta { display: inline-flex; align-items: center; gap: 0.45rem; margin-bottom: 0.8rem; color: #52717a; font-family: "Archivo", sans-serif; font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.article-card-meta svg { color: var(--gold-dark); }
+.article-card h2 { margin-bottom: 0.85rem; color: var(--navy); font-size: clamp(1.35rem, 2.3vw, 1.85rem); line-height: 1.16; }
+.article-card h2 a:hover { color: #0e6d69; }
+.article-card-excerpt { display: -webkit-box; overflow: hidden; color: var(--muted); -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+.article-card .text-link { margin-top: auto; padding-top: 1.25rem; }
+.archive-empty { border: 1px solid var(--line); background: var(--cream); padding: 1.25rem; color: var(--muted); }
 .archive-browser { display: grid; grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr); gap: clamp(2.5rem, 7vw, 6rem); align-items: start; }
 .archive-browser h2 { margin-bottom: 1rem; font-size: clamp(2rem, 4vw, 3.5rem); }
 .archive-browser > div:first-child > p:last-child { color: var(--muted); }

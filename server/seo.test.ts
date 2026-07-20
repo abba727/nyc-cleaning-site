@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { render } from "../client/src/entry-server";
-import { legacyArchives, legacyArticles, pages, siteOrigin } from "../client/src/content/site";
+import { pages, siteOrigin } from "../client/src/content/site";
+import { legacyArchives, legacyArticles } from "../client/src/content/legacy-content";
 import { canonicalRedirects, getArchiveSeo, getLegacySeo, getPageSeo, SEO_DESCRIPTION_MAX_LENGTH, SEO_TITLE_MAX_LENGTH } from "../client/src/content/seo";
 import { buildRobotsText, buildSitemapXml, getPermanentRedirect } from "./seoRoutes";
 
@@ -29,6 +30,15 @@ describe("public SEO rendering", () => {
     expect(result.head).toContain('"@type":"ImageObject"');
     expect(result.head).toContain(`https://www.nyccleaning.co${article.path}`);
     expect(result.html).toContain("NYC cleaning insights");
+  });
+
+  it("server-renders the canonical blog archive as linked visual article cards", async () => {
+    const archive = await render("/blog/");
+    expect(archive.status).toBe(200);
+    expect(archive.head).toContain('<link rel="canonical" href="https://www.nyccleaning.co/blog/" />');
+    expect(archive.html).toContain("Insights for New York properties");
+    expect(archive.html).toContain("article-card-image");
+    expect(archive.html).toContain("Read article");
   });
 
   it("returns distinct crawler states for archives, legal pages, admin, and missing routes", async () => {
@@ -63,7 +73,7 @@ describe("SEO metadata inventory", () => {
       ...pages.map(getPageSeo).filter(item => item.indexable),
       ...legacyArticles.map(getLegacySeo),
       ...legacyArchives.map(getLegacySeo),
-      getArchiveSeo("/category/blog/"),
+      getArchiveSeo("/blog/"),
     ];
     const titles = metadata.map(item => item.title.toLocaleLowerCase("en-US"));
     expect(new Set(titles).size).toBe(titles.length);
@@ -89,8 +99,8 @@ describe("crawl controls", () => {
     expect(new Set(locations).size).toBe(locations.length);
     expect(xml).toContain(`<loc>${siteOrigin}/cms-seo-guide/</loc>`);
     expect(xml).toContain("<lastmod>2026-07-16</lastmod>");
-    expect(xml).toContain(`<loc>${siteOrigin}/category/blog/</loc>`);
-    expect(xml).not.toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(xml).toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(xml).not.toContain(`<loc>${siteOrigin}/category/blog/</loc>`);
     expect(xml).not.toContain(`<loc>${siteOrigin}/service-guru-app-privacy-policy/</loc>`);
     expect(xml).not.toContain(`<loc>${siteOrigin}/privacy-policy/</loc>`);
   });
@@ -105,7 +115,8 @@ describe("crawl controls", () => {
     expect(robots).toContain(`Sitemap: ${siteOrigin}/sitemap.xml`);
     expect(staticRobots).toBe(robots);
     expect(staticSitemap).toContain(`<loc>${siteOrigin}/services/commercial-cleaning-nyc/</loc>`);
-    expect(staticSitemap).not.toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(staticSitemap).toContain(`<loc>${siteOrigin}/blog/</loc>`);
+    expect(staticSitemap).not.toContain(`<loc>${siteOrigin}/category/blog/</loc>`);
     expect(staticSitemap).not.toContain(`<loc>${siteOrigin}/service-guru-app-privacy-policy/</loc>`);
     expect(staticSitemap).not.toMatch(/<loc>[^<]*(?:wp-content|wp-json|\/feed\/|\?)[^<]*<\/loc>/);
   });

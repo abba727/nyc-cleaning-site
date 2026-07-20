@@ -9,7 +9,7 @@ const mainLinks = [
   { href: "/cleaning-service-nyc/", label: "Services" },
   { href: "/who-we-are/", label: "Who We Are" },
   { href: "/we-serve-new-york/", label: "Service Area" },
-  { href: "/category/blog/", label: "Insights" },
+  { href: "/blog/", label: "Insights" },
 ];
 
 export function SiteHeader() {

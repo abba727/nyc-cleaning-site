@@ -9,9 +9,9 @@ export const canonicalRedirects: Record<string, string> = {
   "/about/": "/about-us/",
   "/privacy-policy/": "/service-guru-app-privacy-policy/",
   "/commercial-cleaning-nyc/": "/services/commercial-cleaning-nyc/",
-  "/blog/": "/category/blog/",
-  "/category/cleaning-services/": "/category/blog/",
-  "/category/uncategorized/": "/category/blog/",
+  "/category/blog/": "/blog/",
+  "/category/cleaning-services/": "/blog/",
+  "/category/uncategorized/": "/blog/",
 };
 
 const pageSeoOverrides: Record<string, { title?: string; description?: string; indexable?: boolean }> = {
@@ -139,7 +139,7 @@ export function getArchiveSeo(path: string) {
     };
   }
   return {
-    path: "/category/blog/",
+    path: "/blog/",
     title: "NYC Cleaning and Property Maintenance Insights",
     description: "Practical commercial cleaning and property-maintenance guidance from NYC Cleaning and Maintenance.",
     h1: "Cleaning and Property Maintenance Insights",

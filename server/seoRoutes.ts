@@ -33,7 +33,7 @@ export function buildSitemapXml(cmsArticles: SitemapArticle[] = []) {
     const seo = getPageSeo(page);
     if (seo.indexable && !getCanonicalRedirect(seo.path)) entries.set(seo.path, undefined);
   }
-  entries.set("/category/blog/", undefined);
+  entries.set("/blog/", undefined);
   for (const archive of legacyArchives) entries.set(normalizePath(archive.path), archive.publishedAt || undefined);
   for (const article of legacyArticles) entries.set(normalizePath(article.path), article.publishedAt || undefined);
   for (const article of cmsArticles) {
