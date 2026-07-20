@@ -13,6 +13,7 @@ import { company, getPageByPath, getPageImage, isBlogArchivePath, normalizePath,
 import { getArchiveSeo, getLegacySeo, getPageSeo } from "./content/seo";
 import type { LegacyContentPayload } from "./contexts/LegacyContentContext";
 import { getPublishedArticleByPath } from "../../server/db";
+import { toPublicMediaUrl } from "../../server/storage";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
@@ -21,12 +22,13 @@ const ARTICLE_LOOKUP_TIMEOUT_MS = 2_000;
 async function getCmsArticleForRender(pathname: string) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
+    const article = await Promise.race([
       getPublishedArticleByPath(pathname),
       new Promise<undefined>(resolve => {
         timeout = setTimeout(() => resolve(undefined), ARTICLE_LOOKUP_TIMEOUT_MS);
       }),
     ]);
+    return article ? { ...article, coverImageUrl: toPublicMediaUrl(article.coverImageUrl) } : article;
   } catch {
     return undefined;
   } finally {
@@ -76,7 +78,7 @@ export async function render(url: string) {
   const crumbs = [{ name: "Home", item: `${siteOrigin}/` }];
   if (seo.path !== "/") crumbs.push({ name: seo.h1.replace(/\s*\|.*$/, ""), item: canonical });
   const isArticle = Boolean(cmsArticle || matchedLegacy?.kind === "article");
-  const pageSchema = { "@type": isArticle ? "Article" : "WebPage", "@id": `${canonical}#webpage`, url: canonical, name: seo.title, headline: isArticle ? seo.h1 : undefined, datePublished: cmsArticle?.publishedAt?.toISOString() || matchedLegacy?.publishedAt || undefined, image: imageUrl, description: seo.description, isPartOf: { "@id": `${siteOrigin}/#website` } };
+  const pageSchema = { "@type": isArticle ? "Article" : "WebPage", "@id": `${canonical}#webpage`, url: canonical, name: seo.title, headline: isArticle ? seo.h1 : undefined, datePublished: cmsArticle?.publishedAt?.toISOString() || matchedLegacy?.publishedAt || undefined, dateModified: cmsArticle?.updatedAt?.toISOString() || undefined, image: imageUrl, description: seo.description, isPartOf: { "@id": `${siteOrigin}/#website` } };
   const schema = {
     "@context": "https://schema.org",
     "@graph": [

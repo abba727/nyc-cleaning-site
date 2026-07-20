@@ -20,7 +20,7 @@ describe("CMS Insight SSR hydration", () => {
         { type: "p", text: "Published CMS Insight content is visible in the first server response." },
       ],
       blocks: [],
-      coverImageUrl: "/media/cms-cover.webp",
+      coverImageUrl: "/manus-storage/generated/cms-cover.webp",
       coverImageAlt: "Cleaner maintaining a commercial lobby",
       seoTitle: "CMS SSR SEO Guide | NYC Cleaning",
       metaDescription: "Learn how NYC Cleaning publishes crawler-visible Insight content with stable server rendering.",
@@ -34,6 +34,9 @@ describe("CMS Insight SSR hydration", () => {
     expect(result.html).not.toContain("Loading article");
     expect(result.head).toContain("window.__INITIAL_ARTICLE__=");
     expect(result.head).toContain('"@type":"Article"');
+    expect(result.html).toContain('/media/generated/cms-cover.webp');
+    expect(result.head).toContain('/media/generated/cms-cover.webp');
+    expect(result.html).not.toContain('/manus-storage/');
     expect(result.head).toContain('"dateModified":"2026-07-17T01:00:00.000Z"');
   });
 
