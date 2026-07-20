@@ -39,6 +39,12 @@ describe("public SEO rendering", () => {
     expect(archive.html).toContain("Insights for New York properties");
     expect(archive.html).toContain("article-card-image");
     expect(archive.html).toContain("Read article");
+    expect((archive.html.match(/class=\"article-card\"/g) || []).length).toBe(9);
+    expect(archive.html).not.toContain("Explore by month");
+    expect(archive.html).toContain("Turn helpful insight into dependable property care.");
+    expect(archive.html).toContain("Commercial Cleaning");
+    expect(archive.html).toContain("Deep Cleaning");
+    expect(archive.html).toContain("Porter Services");
   });
 
   it("returns distinct crawler states for archives, legal pages, admin, and missing routes", async () => {

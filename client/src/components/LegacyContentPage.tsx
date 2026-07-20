@@ -1,14 +1,23 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { ArrowRight, CalendarDays, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarDays, ShieldCheck } from "lucide-react";
 import { brandAssets } from "@/content/assets";
-import { company, isBlogArchivePath, normalizePath, siteOrigin, type LegacyContent } from "@/content/site";
+import { getResponsiveMedia } from "@/content/responsive-media";
+import { company, featuredServices, getPageImage, isBlogArchivePath, normalizePath, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
 import { useLegacyContent } from "@/contexts/LegacyContentContext";
 import { ClientDataProvider } from "./ClientDataProvider";
 import { trpc } from "@/lib/trpc";
 import type { InitialPublishedArticle } from "./PublicPage";
 
 type ArticleView = LegacyContent & { coverImageUrl?: string; coverImageAlt?: string };
+
+const ARTICLES_PER_PAGE = 9;
+const BLOG_SERVICE_PATHS = new Set([
+  "/services/commercial-cleaning-nyc/",
+  "/services/deep-cleaning-services-nyc/",
+  "/services/porter-services-nyc/",
+]);
+const blogServiceHighlights = featuredServices.filter(service => BLOG_SERVICE_PATHS.has(service.path));
 
 function databaseArticleToView(article: {
   path: string;
@@ -83,6 +92,20 @@ function ArticleImage({
   return <img src={image} alt={alt} loading={loading} fetchPriority={fetchPriority} decoding="async" />;
 }
 
+function ServiceHighlightImage({ service }: { service: SitePage }) {
+  const image = getPageImage(service);
+  const responsiveMedia = getResponsiveMedia(image);
+  const alt = `${serviceName(service)} in New York City`;
+
+  if (!responsiveMedia) return <img src={image} alt={alt} loading="lazy" decoding="async" />;
+
+  return <picture className="responsive-picture">
+    <source type="image/avif" srcSet={responsiveMedia.avifSrcSet} sizes={responsiveMedia.sizes} />
+    <source type="image/webp" srcSet={responsiveMedia.fallbackSrcSet} sizes={responsiveMedia.sizes} />
+    <img src={image} srcSet={responsiveMedia.fallbackSrcSet} sizes={responsiveMedia.sizes} alt={alt} loading="lazy" decoding="async" />
+  </picture>;
+}
+
 function LegacyArticlePage({ content }: { content: ArticleView }) {
   const publishedDate = formatPublicationDate(content.publishedAt, { month: "long", day: "numeric", year: "numeric" });
   return <>
@@ -92,13 +115,6 @@ function LegacyArticlePage({ content }: { content: ArticleView }) {
     <section className="section section-cream"><div className="container review-invite"><div><p className="eyebrow">More NYC property insights</p><h2>Explore practical cleaning and maintenance guidance.</h2></div><Link href="/blog/" className="button button-navy">View All Articles</Link></div></section>
   </>;
 }
-
-const archiveLabel = (path: string) => {
-  const match = normalizePath(path).match(/^\/(\d{4})\/(\d{2})\/$/);
-  if (!match) return path;
-  return new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
-    .format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
-};
 
 function formatPublicationDate(value: string | Date | null | undefined, format: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", year: "numeric" }) {
   if (!value) return null;
@@ -110,10 +126,10 @@ function formatPublicationDate(value: string | Date | null | undefined, format: 
 
 function BlogArchivePage({ content, databaseArticles }: { content: LegacyContent | null; databaseArticles?: ArticleView[] }) {
   const { payload } = useLegacyContent();
+  const [selectedPage, setSelectedPage] = useState(1);
   const locationPath = content?.path || "/blog/";
   const isMonthlyArchive = content?.kind === "archive";
   const staticArticles = payload?.content.filter(item => item.kind === "article") || [];
-  const staticArchives = payload?.content.filter(item => item.kind === "archive") || [];
   const articles = databaseArticles?.length
     ? (isMonthlyArchive
       ? databaseArticles.filter(article => article.publishedAt.startsWith(locationPath.slice(1, 8).replace("/", "-")))
@@ -121,15 +137,29 @@ function BlogArchivePage({ content, databaseArticles }: { content: LegacyContent
     : (isMonthlyArchive
       ? staticArticles.filter(article => article.publishedAt.startsWith(locationPath.slice(1, 8).replace("/", "-")))
       : [...staticArticles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)));
-  const monthArchives = [...staticArchives].sort((a, b) => b.path.localeCompare(a.path));
   const sourceTitle = content?.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, "") || "Cleaning and Property Maintenance Insights";
   const title = isMonthlyArchive ? sourceTitle : "Insights for New York properties";
   const articleLabel = `${articles.length} ${articles.length === 1 ? "article" : "articles"}`;
+  const totalPages = Math.max(1, Math.ceil(articles.length / ARTICLES_PER_PAGE));
+  const currentPage = Math.min(selectedPage, totalPages);
+  const pageStart = (currentPage - 1) * ARTICLES_PER_PAGE;
+  const pageArticles = articles.slice(pageStart, pageStart + ARTICLES_PER_PAGE);
+  const displayStart = articles.length ? pageStart + 1 : 0;
+  const displayEnd = Math.min(pageStart + ARTICLES_PER_PAGE, articles.length);
+
+  const changePage = (nextPage: number) => {
+    const boundedPage = Math.max(1, Math.min(nextPage, totalPages));
+    setSelectedPage(boundedPage);
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => document.getElementById("insights-articles")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  };
+
   return <>
     <ClientLegacyHead content={content} />
     <section className="interior-hero legal insights-hero"><div className="container interior-hero-grid"><div><p className="eyebrow light">NYC Cleaning and Maintenance</p><h1>{title}</h1><p>{isMonthlyArchive ? "Browse practical guidance published during this month." : "Practical cleaning, building maintenance, and property-care guidance for the people who run New York City properties."}</p>{!isMonthlyArchive && <p className="insights-count">{articleLabel} and growing</p>}</div></div></section>
-    <section className="section insights-archive-section"><div className="container"><div className="section-heading split"><div><p className="eyebrow">{isMonthlyArchive ? "Archive" : "Latest insights"}</p><h2>{isMonthlyArchive ? sourceTitle : "Explore every recent article."}</h2></div><p>{isMonthlyArchive ? "Select an article to read the full guidance." : "Each article includes a cover image, a concise preview, and a direct link to the complete insight."}</p></div>{articles.length ? <div className="article-grid">{articles.map((article, index) => { const publishedDate = formatPublicationDate(article.publishedAt); const articleTitle = article.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, ""); return <article className="article-card" key={article.path}><Link href={article.path} className="article-card-image" aria-label={`Read ${articleTitle}`}><ArticleImage content={article} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index < 3 ? "high" : "auto"} /><span className="article-card-image-shade" aria-hidden="true" /></Link><div className="article-card-body"><p className="article-card-meta">{publishedDate ? <><CalendarDays size={15} aria-hidden="true" />{publishedDate}</> : "NYC Cleaning insights"}</p><h2><Link href={article.path}>{articleTitle}</Link></h2><p className="article-card-excerpt">{article.description}</p><Link href={article.path} className="text-link">Read article <ArrowRight size={16} aria-hidden="true" /></Link></div></article>; })}</div> : <p className="archive-empty">New insights will appear here as soon as they are published.</p>}</div></section>
-    {!isMonthlyArchive && monthArchives.length > 0 && <section className="section section-cream"><div className="container archive-browser"><div><p className="eyebrow">Explore by month</p><h2>Browse the complete archive.</h2><p>All published insights remain available at their original URLs and are organized by month for quick reference.</p></div><div className="archive-months">{monthArchives.map(archive => <Link href={archive.path} key={archive.path}>{archiveLabel(archive.path)}<ArrowRight size={15} aria-hidden="true" /></Link>)}</div></div></section>}
+    <section className="section insights-archive-section" id="insights-articles"><div className="container"><div className="section-heading split"><div><p className="eyebrow">{isMonthlyArchive ? "Archive" : "Latest insights"}</p><h2>{isMonthlyArchive ? sourceTitle : "Explore every recent article."}</h2></div><p>{isMonthlyArchive ? "Select an article to read the full guidance." : "Each article includes a cover image, a concise preview, and a direct link to the complete insight."}</p></div>{articles.length ? <><div className="article-grid">{pageArticles.map((article, index) => { const publishedDate = formatPublicationDate(article.publishedAt); const articleTitle = article.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, ""); return <article className="article-card" key={article.path}><Link href={article.path} className="article-card-image" aria-label={`Read ${articleTitle}`}><ArticleImage content={article} loading={index < 3 ? "eager" : "lazy"} fetchPriority={index < 3 ? "high" : "auto"} /><span className="article-card-image-shade" aria-hidden="true" /></Link><div className="article-card-body"><p className="article-card-meta">{publishedDate ? <><CalendarDays size={15} aria-hidden="true" />{publishedDate}</> : "NYC Cleaning insights"}</p><h2><Link href={article.path}>{articleTitle}</Link></h2><p className="article-card-excerpt">{article.description}</p><Link href={article.path} className="text-link">Read article <ArrowRight size={16} aria-hidden="true" /></Link></div></article>; })}</div>{totalPages > 1 && <nav className="insights-pagination" aria-label="Insights pages"><p className="insights-pagination-summary">Showing {displayStart}–{displayEnd} of {articles.length} articles</p><div className="insights-pagination-controls"><button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><ArrowLeft size={16} aria-hidden="true" />Previous</button>{Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => <button type="button" className="pagination-button" key={pageNumber} onClick={() => changePage(pageNumber)} aria-current={currentPage === pageNumber ? "page" : undefined}>{pageNumber}</button>)}<button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>Next<ArrowRight size={16} aria-hidden="true" /></button></div></nav>}</> : <p className="archive-empty">New insights will appear here as soon as they are published.</p>}</div></section>
+    {!isMonthlyArchive && <section className="section section-cream insights-services-section"><div className="container"><div className="section-heading split"><div><p className="eyebrow">Services for your property</p><h2>Turn helpful insight into dependable property care.</h2></div><p>From ongoing cleaning to deeper resets and day-to-day porter support, we build practical service plans around your building.</p></div><div className="service-grid">{blogServiceHighlights.map(service => <article className="service-card" key={service.path}><Link href={service.path} className="service-image" aria-label={`Explore ${serviceName(service)}`}><ServiceHighlightImage service={service} /></Link><div className="service-card-body"><p className="eyebrow">NYC property care</p><h3><Link href={service.path}>{serviceName(service)}</Link></h3><p>{service.description}</p><Link href={service.path} className="text-link">Explore service <ArrowRight size={16} aria-hidden="true" /></Link></div></article>)}</div><div className="insights-services-cta"><Link href="/cleaning-service-nyc/" className="button button-navy">Explore All Services</Link><Link href="/contact/" className="text-link">Request a tailored quote <ArrowRight size={16} aria-hidden="true" /></Link></div></div></section>}
   </>;
 }
 
