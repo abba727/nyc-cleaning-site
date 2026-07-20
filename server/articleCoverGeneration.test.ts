@@ -64,12 +64,12 @@ describe("article cover generation", () => {
   it("passes the body-derived prompt to the image service and returns its durable result", async () => {
     imageGenerationMocks.generateImage.mockResolvedValue({
       key: "generated/lobby-routine.webp",
-      url: "/manus-storage/lobby-routine.webp",
+      url: "/media/lobby-routine.webp",
     });
 
     await expect(generateArticleCover({ body: articleBody })).resolves.toEqual({
       key: "generated/lobby-routine.webp",
-      url: "/manus-storage/lobby-routine.webp",
+      url: "/media/lobby-routine.webp",
     });
     expect(imageGenerationMocks.generateImage).toHaveBeenCalledWith({
       prompt: expect.stringContaining(articleBody),

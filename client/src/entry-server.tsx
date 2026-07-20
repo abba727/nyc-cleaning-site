@@ -98,7 +98,7 @@ export async function render(url: string) {
   };
 
   const homeHeroPreload = pathname === "/"
-    ? `<link rel="preload" as="image" type="image/avif" href="/manus-storage/responsive-media/nyc-cleaning-hero-v2_40f4e363-800w.avif" imagesrcset="${responsiveMedia.hero.avifSrcSet}" imagesizes="${responsiveMedia.hero.sizes}" fetchpriority="high" />`
+    ? `<link rel="preload" as="image" type="image/avif" href="/media/responsive-media/nyc-cleaning-hero-v2_40f4e363-800w.avif" imagesrcset="${responsiveMedia.hero.avifSrcSet}" imagesizes="${responsiveMedia.hero.sizes}" fetchpriority="high" />`
     : "";
 
   const legacyHydration = legacyPayload

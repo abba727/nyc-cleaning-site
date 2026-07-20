@@ -57,7 +57,7 @@ describe("article cover image descriptions", () => {
   });
 
   it("rejects a non-URL image reference before calling the vision model", async () => {
-    await expect(generateArticleCoverDescription(input, "/manus-storage/generated/cover.png")).rejects.toThrow();
+    await expect(generateArticleCoverDescription(input, "/media/generated/cover.png")).rejects.toThrow();
     expect(llmMocks.invokeLLM).not.toHaveBeenCalled();
   });
 });

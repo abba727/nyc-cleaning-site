@@ -7,7 +7,7 @@ type ResponsiveMedia = {
 };
 
 const storageVariant = (stem: string, width: number, format: "avif" | "webp") =>
-  `/manus-storage/responsive-media/${stem}-${width}w.${format}`;
+  `/media/responsive-media/${stem}-${width}w.${format}`;
 
 const createResponsiveMedia = (
   stem: string,

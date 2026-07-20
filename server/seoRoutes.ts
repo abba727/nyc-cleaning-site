@@ -5,7 +5,7 @@ import { getCanonicalRedirect, getPageSeo } from "../client/src/content/seo";
 import { listPublishedArticles } from "./db";
 
 const xmlEscape = (value: string) => value.replace(/[<>&'\"]/g, character => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[character] || character);
-const ignoredPrefixes = ["/api/", "/oauth/", "/manus-storage/", "/__manus__/", "/src/", "/@vite/", "/node_modules/"];
+const ignoredPrefixes = ["/api/", "/oauth/", "/media/", "/__manus__/", "/src/", "/@vite/", "/node_modules/"];
 
 type SitemapArticle = {
   path: string;

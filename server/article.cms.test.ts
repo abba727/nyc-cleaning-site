@@ -14,7 +14,11 @@ const dbMocks = vi.hoisted(() => ({
   updateInquiryNotificationStatus: vi.fn(),
 }));
 
-const storageMocks = vi.hoisted(() => ({ storageGetSignedUrl: vi.fn(), storagePut: vi.fn() }));
+const storageMocks = vi.hoisted(() => ({
+  storageGetSignedUrl: vi.fn(),
+  storagePut: vi.fn(),
+  toPublicMediaUrl: vi.fn((value: string) => value),
+}));
 const imageGenerationMocks = vi.hoisted(() => ({ generateImage: vi.fn() }));
 const imageDescriptionMocks = vi.hoisted(() => ({
   fallbackArticleCoverDescription: vi.fn(),
@@ -66,7 +70,7 @@ const validArticle = {
   seoTitle: "Building Cleaning Guide | NYC Cleaning",
   metaDescription: "Learn how to plan a practical cleaning program for a New York property.",
   authorName: "NYC Cleaning and Maintenance",
-  coverImageUrl: "/manus-storage/building-cleaning-guide.png",
+  coverImageUrl: "/media/building-cleaning-guide.png",
   coverImageKey: "article-covers/owner/building-cleaning-guide.png",
   coverImageAlt: "A professionally maintained New York building lobby",
   sourceUrl: "",
@@ -155,7 +159,7 @@ describe("article CMS authorization and contracts", () => {
   it("uploads CMS cover images to deployment-safe object storage", async () => {
     storageMocks.storagePut.mockResolvedValue({
       key: "article-covers/owner/lobby-cover.png",
-      url: "/manus-storage/lobby-cover.png",
+      url: "/media/lobby-cover.png",
     });
     const caller = appRouter.createCaller(context(user({ openId: ENV.ownerOpenId, role: "content_manager" })));
 
@@ -165,7 +169,7 @@ describe("article CMS authorization and contracts", () => {
       base64: Buffer.from("valid image bytes").toString("base64"),
     });
 
-    expect(result.url).toBe("/manus-storage/lobby-cover.png");
+    expect(result.url).toBe("/media/lobby-cover.png");
     expect(storageMocks.storagePut).toHaveBeenCalledWith(
       `article-covers/${ENV.ownerOpenId}/lobby-cover.png`,
       expect.any(Buffer),
@@ -177,7 +181,7 @@ describe("article CMS authorization and contracts", () => {
     const body = "A New York apartment lobby porter follows resident traffic, delivery windows, rainy-day floor conditions, entry-glass care, touchpoint cleaning, waste removal, and elevator detailing. ".repeat(2);
     imageGenerationMocks.generateImage.mockResolvedValue({
       key: "generated/nyc-lobby.png",
-      url: "/manus-storage/nyc-lobby.png",
+      url: "/media/nyc-lobby.png",
     });
     imageDescriptionMocks.generateArticleCoverDescription.mockResolvedValue(
       "A porter cleans the stone floor of a busy New York apartment lobby",
@@ -193,7 +197,7 @@ describe("article CMS authorization and contracts", () => {
 
     expect(result).toEqual({
       key: "generated/nyc-lobby.png",
-      url: "/manus-storage/nyc-lobby.png",
+      url: "/media/nyc-lobby.png",
       description: "A porter cleans the stone floor of a busy New York apartment lobby",
     });
     expect(imageGenerationMocks.generateImage).toHaveBeenCalledWith({
@@ -209,7 +213,7 @@ describe("article CMS authorization and contracts", () => {
 
   it("returns an article-derived description fallback without discarding a successful generated image", async () => {
     const body = "A detailed Article Body about New York lobby floors, entry glass, elevator detailing, porter service windows, deliveries, and resident traffic. ".repeat(2);
-    imageGenerationMocks.generateImage.mockResolvedValue({ key: "generated/fallback.png", url: "/manus-storage/fallback.png" });
+    imageGenerationMocks.generateImage.mockResolvedValue({ key: "generated/fallback.png", url: "/media/fallback.png" });
     imageDescriptionMocks.fallbackArticleCoverDescription.mockReturnValue("Editorial cover illustrating a New York lobby cleaning plan");
     imageDescriptionMocks.generateArticleCoverDescription.mockRejectedValue(new Error("Temporary model error"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -218,7 +222,7 @@ describe("article CMS authorization and contracts", () => {
     try {
       await expect(caller.article.generateCover({ body })).resolves.toEqual({
         key: "generated/fallback.png",
-        url: "/manus-storage/fallback.png",
+        url: "/media/fallback.png",
         description: "Editorial cover illustrating a New York lobby cleaning plan",
       });
     } finally {

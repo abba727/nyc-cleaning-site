@@ -12,7 +12,7 @@ import { fallbackArticleCoverDescription, generateArticleCoverDescription } from
 import { generateArticleSeoFields } from "./articleSeoGeneration";
 import { generateArticleFromTopic } from "./articleGeneration";
 import { generateArticleTitleSuggestion } from "./articleTitleGeneration";
-import { storageGetSignedUrl, storagePut } from "./storage";
+import { storageGetSignedUrl, storagePut, toPublicMediaUrl } from "./storage";
 import {
   createCmsSessionToken,
   hashPassword,
@@ -123,13 +123,21 @@ const normalizedArticlePath = z.string().trim().min(3).max(512).transform(value 
 });
 
 const articleCoverUrl = z.string().trim().min(1).max(4000).refine(value => {
-  if (value.startsWith("/manus-storage/")) return true;
+  if (value.startsWith("/media/") || value.startsWith("/manus-storage/")) return true;
   try {
     return ["http:", "https:"].includes(new URL(value).protocol);
   } catch {
     return false;
   }
-}, "Enter a secure image URL or upload an image.");
+}, "Enter a secure image URL or upload an image.").transform(toPublicMediaUrl);
+
+function normalizeArticleMedia<T extends { coverImageUrl: string }>(article: T): T {
+  return { ...article, coverImageUrl: toPublicMediaUrl(article.coverImageUrl) };
+}
+
+function normalizeNullableArticleMedia<T extends { coverImageUrl: string }>(article: T | null): T | null {
+  return article ? normalizeArticleMedia(article) : null;
+}
 
 const articleInput = z.object({
   path: normalizedArticlePath,
@@ -429,11 +437,15 @@ export const appRouter = router({
     }),
   }),
   article: router({
-    listPublished: publicProcedure.query(() => listPublishedArticles()),
-    byPath: publicProcedure.input(z.object({ path: normalizedArticlePath })).query(({ input }) =>
-      getPublishedArticleByPath(input.path),
+    listPublished: publicProcedure.query(async () =>
+      (await listPublishedArticles()).map(article => normalizeArticleMedia(article)),
     ),
-    adminList: adminProcedure.query(() => listAllArticles()),
+    byPath: publicProcedure.input(z.object({ path: normalizedArticlePath })).query(async ({ input }) =>
+      normalizeNullableArticleMedia(await getPublishedArticleByPath(input.path)),
+    ),
+    adminList: adminProcedure.query(async () =>
+      (await listAllArticles()).map(article => normalizeArticleMedia(article)),
+    ),
     create: adminProcedure.input(articleInput).mutation(async ({ input, ctx }) => {
       await ensureArticleUrlAvailable(input);
       const id = await createArticle({

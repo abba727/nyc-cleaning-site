@@ -1,6 +1,9 @@
 import { Storage } from "@google-cloud/storage";
 import { ENV } from "./_core/env";
 
+export const LEGACY_MEDIA_PATH_PREFIX = "/manus-storage/";
+export const PUBLIC_MEDIA_PATH_PREFIX = "/media/";
+
 let googleStorage: Storage | null = null;
 
 function getGoogleStorage() {
@@ -30,6 +33,21 @@ function appendHashSuffix(relKey: string): string {
   const lastDot = relKey.lastIndexOf(".");
   if (lastDot === -1) return `${relKey}_${hash}`;
   return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
+}
+
+/**
+ * Converts a stored legacy media URL to the neutral public route. Existing
+ * database values can remain readable while all newly emitted URLs are clean.
+ */
+export function toPublicMediaUrl(url: string): string {
+  if (url.startsWith(LEGACY_MEDIA_PATH_PREFIX)) {
+    return `${PUBLIC_MEDIA_PATH_PREFIX}${url.slice(LEGACY_MEDIA_PATH_PREFIX.length)}`;
+  }
+  return url;
+}
+
+export function publicMediaUrlForKey(relKey: string): string {
+  return `${PUBLIC_MEDIA_PATH_PREFIX}${normalizeKey(relKey)}`;
 }
 
 async function putToGoogleCloudStorage(
@@ -97,19 +115,19 @@ export async function storagePut(
     await putToLegacyStorage(key, data, contentType);
   }
 
-  return { key, url: `/manus-storage/${key}` };
+  return { key, url: publicMediaUrlForKey(key) };
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
-  return { key, url: `/manus-storage/${key}` };
+  return { key, url: publicMediaUrlForKey(key) };
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
   const key = normalizeKey(relKey);
 
   if (ENV.gcsBucket) {
-    return `/manus-storage/${key}`;
+    return publicMediaUrlForKey(key);
   }
 
   const { forgeUrl, forgeKey } = getLegacyForgeConfig();
