@@ -309,15 +309,20 @@ export async function reconcileVerifiedMigrationHistory(pool, migrationsFolder) 
       return;
     }
 
-    const matches = migrations
-      .map((migration, index) => ({ index, migration, mismatches: compareSchemaToSnapshot(actual, migration.snapshot) }))
-      .filter((candidate) => candidate.mismatches.length === 0);
-    const match = matches.at(-1);
+    const candidates = migrations.map((migration, index) => ({
+      index,
+      migration,
+      mismatches: compareSchemaToSnapshot(actual, migration.snapshot),
+    }));
+    const match = candidates.filter((candidate) => candidate.mismatches.length === 0).at(-1);
 
     if (!match) {
-      const finalCheck = compareSchemaToSnapshot(actual, migrations.at(-1).snapshot);
+      const closest = [...candidates].sort((left, right) => {
+        const mismatchCount = left.mismatches.length - right.mismatches.length;
+        return mismatchCount || right.index - left.index;
+      })[0];
       throw new Error(
-        `existing schema does not exactly match a checked-in migration snapshot; refusing reconciliation. Sample differences: ${finalCheck.slice(0, 8).join("; ")}`,
+        `existing schema does not exactly match a checked-in migration snapshot; refusing reconciliation. Closest snapshot: ${closest.migration.tag}. Sample differences: ${closest.mismatches.slice(0, 8).join("; ")}`,
       );
     }
     if (recorded.length > match.index + 1) {
