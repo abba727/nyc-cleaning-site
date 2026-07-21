@@ -84,6 +84,10 @@ function fullAddress(location: { address: string; city: string; state: string; z
   return `${location.address}, ${location.city}, ${location.state} ${location.zip}`;
 }
 
+function isCompleteProjectLocation(row: ProjectLocationDraft) {
+  return row.address.length >= 2 && row.city.length >= 2 && row.state.length >= 2 && row.zip.length >= 3;
+}
+
 export default function AdminProjects() {
   const utils = trpc.useUtils();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -181,7 +185,7 @@ export default function AdminProjects() {
       const invalidRowNumbers: number[] = [];
       sourceRows.forEach((sourceRow, index) => {
         const row = extractLocation(sourceRow);
-        if (!row.address || !row.city || !row.state || !row.zip) {
+        if (!isCompleteProjectLocation(row)) {
           invalidRowNumbers.push(index + 2);
           return;
         }

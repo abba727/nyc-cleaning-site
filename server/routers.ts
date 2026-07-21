@@ -181,20 +181,33 @@ const articleInput = z.object({
   publishedAt: z.coerce.date().nullable().optional(),
 });
 
-const projectLocationInput = z.object({
+const projectLocationImportRowInput = z.object({
+  address: z.string().trim().max(512),
+  city: z.string().trim().max(160),
+  state: z.string().trim().max(64),
+  zip: z.string().trim().max(24),
+  label: z.string().trim().max(255).optional(),
+  latitude: z.number().finite().min(-90).max(90).nullable().optional(),
+  longitude: z.number().finite().min(-180).max(180).nullable().optional(),
+});
+
+const projectLocationInput = projectLocationImportRowInput.extend({
   address: z.string().trim().min(2).max(512),
   city: z.string().trim().min(2).max(160),
   state: z.string().trim().min(2).max(64),
   zip: z.string().trim().min(3).max(24),
-  label: z.string().trim().max(255).optional(),
-  latitude: z.number().finite().min(-90).max(90).nullable().optional(),
-  longitude: z.number().finite().min(-180).max(180).nullable().optional(),
 });
 
 const projectLocationUpdateInput = projectLocationInput.extend({
   id: z.number().int().positive(),
   isActive: z.boolean(),
 });
+
+function isCompleteProjectLocation(
+  input: z.infer<typeof projectLocationImportRowInput>,
+): input is z.infer<typeof projectLocationInput> {
+  return input.address.length >= 2 && input.city.length >= 2 && input.state.length >= 2 && input.zip.length >= 3;
+}
 
 function normalizeProjectLocation(input: z.infer<typeof projectLocationInput>) {
   return {
@@ -511,7 +524,7 @@ export const appRouter = router({
       filename: z.string().trim().min(1).max(255),
       sourceType: z.enum(["csv", "xlsx", "xls"]),
       sourceRowCount: z.number().int().positive().max(5000),
-      rows: z.array(projectLocationInput).min(1).max(5000),
+      rows: z.array(projectLocationImportRowInput).min(1).max(5000),
     })).mutation(async ({ input, ctx }) => {
       if (input.rows.length > input.sourceRowCount) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "The parsed address count cannot exceed the source row count." });
@@ -519,6 +532,7 @@ export const appRouter = router({
 
       const seen = new Set<string>();
       const rows = input.rows
+        .filter(isCompleteProjectLocation)
         .map(normalizeProjectLocation)
         .filter(row => {
           const key = [row.address, row.city, row.state, row.zip]
@@ -528,6 +542,10 @@ export const appRouter = router({
           seen.add(key);
           return true;
         });
+      if (rows.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No rows contained a complete address, city, state, and ZIP code." });
+      }
+
       const skippedCount = input.sourceRowCount - rows.length;
       const status = skippedCount > 0 ? "partial" : "completed" as const;
       const errorSummary = skippedCount > 0
