@@ -28,6 +28,7 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/drizzle ./drizzle
 COPY --from=build /app/scripts/run-migrations.mjs ./scripts/run-migrations.mjs
+COPY --from=build /app/scripts/bootstrap-project-tables.mjs ./scripts/bootstrap-project-tables.mjs
 COPY --from=build /app/scripts/migration-reconciliation.mjs ./scripts/migration-reconciliation.mjs
 COPY --from=build /app/scripts/audit-legacy-data.mjs ./scripts/audit-legacy-data.mjs
 COPY --from=build /app/scripts/migrate-assets-to-gcs.mjs ./scripts/migrate-assets-to-gcs.mjs

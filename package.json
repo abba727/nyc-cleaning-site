@@ -10,8 +10,9 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test:migration-reconciliation": "node scripts/test-migration-reconciliation.mjs",
-    "test": "node scripts/test-migration-reconciliation.mjs && vitest run",
-    "test:ci": "node scripts/test-migration-reconciliation.mjs && vitest run --exclude server/resend.secret.test.ts --exclude server/seo.test.ts",
+    "test:project-bootstrap": "node scripts/test-bootstrap-project-tables.mjs",
+    "test": "node scripts/test-migration-reconciliation.mjs && node scripts/test-bootstrap-project-tables.mjs && vitest run",
+    "test:ci": "node scripts/test-migration-reconciliation.mjs && node scripts/test-bootstrap-project-tables.mjs && vitest run --exclude server/resend.secret.test.ts --exclude server/seo.test.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "node scripts/run-migrations.mjs",
     "storage:migrate": "node scripts/migrate-assets-to-gcs.mjs"

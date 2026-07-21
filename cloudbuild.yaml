@@ -14,7 +14,6 @@ substitutions:
   _DB_PASS_SECRET: nyc-cleaning-db-pass
   _JWT_SECRET_NAME: nyc-cleaning-jwt-secret
   _RESEND_API_KEY_SECRET: nyc-cleaning-resend-api-key
-  _RECONCILE_MIGRATION_HISTORY: "false"
 
 steps:
   - id: validate
@@ -66,8 +65,8 @@ steps:
       - --service-account=${_RUNTIME_SA}
       - --set-cloudsql-instances=${_CLOUD_SQL_CONNECTION}
       - --command=node
-      - --args=scripts/run-migrations.mjs
-      - --set-env-vars=NODE_ENV=production,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},MYSQL_UNIX_SOCKET=/cloudsql/${_CLOUD_SQL_CONNECTION},RECONCILE_MIGRATION_HISTORY=${_RECONCILE_MIGRATION_HISTORY}
+      - --args=scripts/bootstrap-project-tables.mjs
+      - --set-env-vars=NODE_ENV=production,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},MYSQL_UNIX_SOCKET=/cloudsql/${_CLOUD_SQL_CONNECTION}
       - --set-secrets=DB_PASS=${_DB_PASS_SECRET}:latest
       - --max-retries=1
       - --task-timeout=10m
