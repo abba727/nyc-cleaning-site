@@ -1,12 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dbMocks = vi.hoisted(() => ({ getPublishedArticleByPath: vi.fn() }));
+const dbMocks = vi.hoisted(() => ({ getPublishedArticleByPath: vi.fn(), listPublishedArticles: vi.fn() }));
 vi.mock("./db", () => dbMocks);
 
 import { render } from "../client/src/entry-server";
 
 describe("CMS Insight SSR hydration", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMocks.listPublishedArticles.mockResolvedValue([]);
+  });
 
   it("server-renders the published article body and serializes matching initial client state", async () => {
     dbMocks.getPublishedArticleByPath.mockResolvedValue({
@@ -38,6 +41,64 @@ describe("CMS Insight SSR hydration", () => {
     expect(result.head).toContain('/media/generated/cms-cover.webp');
     expect(result.html).not.toContain('/manus-storage/');
     expect(result.head).toContain('"dateModified":"2026-07-17T01:00:00.000Z"');
+  });
+
+  it("server-renders the latest three published insights on the homepage", async () => {
+    dbMocks.listPublishedArticles.mockResolvedValue([
+      {
+        path: "/latest-insight-one/",
+        title: "Latest Insight One",
+        excerpt: "First latest insight.",
+        description: "First latest insight.",
+        body: [],
+        blocks: [],
+        coverImageUrl: "/media/latest-one.webp",
+        coverImageAlt: "Property care guidance",
+        publishedAt: new Date("2026-07-21T12:00:00.000Z"),
+      },
+      {
+        path: "/latest-insight-two/",
+        title: "Latest Insight Two",
+        excerpt: "Second latest insight.",
+        description: "Second latest insight.",
+        body: [],
+        blocks: [],
+        coverImageUrl: "/media/latest-two.webp",
+        coverImageAlt: "Commercial cleaning guidance",
+        publishedAt: new Date("2026-07-20T12:00:00.000Z"),
+      },
+      {
+        path: "/latest-insight-three/",
+        title: "Latest Insight Three",
+        excerpt: "Third latest insight.",
+        description: "Third latest insight.",
+        body: [],
+        blocks: [],
+        coverImageUrl: "/media/latest-three.webp",
+        coverImageAlt: "Building maintenance guidance",
+        publishedAt: new Date("2026-07-19T12:00:00.000Z"),
+      },
+      {
+        path: "/older-insight/",
+        title: "Older Insight",
+        excerpt: "This should not appear in the latest three.",
+        description: "This should not appear in the latest three.",
+        body: [],
+        blocks: [],
+        coverImageUrl: "/media/older.webp",
+        coverImageAlt: "Older guidance",
+        publishedAt: new Date("2026-07-18T12:00:00.000Z"),
+      },
+    ]);
+
+    const result = await render("/");
+    expect(result.status).toBe(200);
+    expect(result.html).toContain("The latest guidance from our team.");
+    expect(result.html).toContain("Latest Insight One");
+    expect(result.html).toContain("Latest Insight Two");
+    expect(result.html).toContain("Latest Insight Three");
+    expect(result.html).not.toContain("Older Insight");
+    expect(result.head).toContain("window.__INITIAL_INSIGHTS__=");
   });
 
   it("escapes serialized article content so it cannot terminate the state script", async () => {

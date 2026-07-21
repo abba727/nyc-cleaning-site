@@ -2,7 +2,9 @@ import { type ImgHTMLAttributes, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
-import LegacyContentPage from "./LegacyContentPage";
+import LegacyContentPage, { ArticleCard, databaseArticleToView } from "./LegacyContentPage";
+import { trpc } from "@/lib/trpc";
+import { useLegacyContent } from "@/contexts/LegacyContentContext";
 import { brandAssets } from "@/content/assets";
 import { getResponsiveMedia } from "@/content/responsive-media";
 import { company, featuredServices, getPageByPath, getPageImage, homepageServices, isBlogArchivePath, normalizePath, pageParagraphs, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
@@ -59,7 +61,17 @@ function TrustStrip() {
   return <section className="trust-strip" aria-label="Why property teams choose NYC Cleaning"><div className="container trust-grid"><div><BadgeCheck aria-hidden="true" /><strong>500+</strong><span>Active clients</span></div><div><Users aria-hidden="true" /><strong>Professional</strong><span>Trained staff and support</span></div><div><Clock3 aria-hidden="true" /><strong>Flexible</strong><span>Custom service schedules</span></div><div><MapPin aria-hidden="true" /><strong>Local</strong><span>Across New York City</span></div></div></section>;
 }
 
-function HomePage({ page }: { page: SitePage }) {
+function HomePage({ page, initialInsights }: { page: SitePage; initialInsights?: InitialPublishedArticle[] }) {
+  const { payload } = useLegacyContent();
+  const publishedQuery = trpc.article.listPublished.useQuery(undefined, { retry: false });
+  const staticArticles = payload?.content.filter(item => item.kind === "article") || [];
+  const initialInsightArticles = initialInsights?.map(databaseArticleToView) || [];
+  const insightSource = publishedQuery.data?.length
+    ? publishedQuery.data.map(databaseArticleToView)
+    : initialInsightArticles.length
+      ? initialInsightArticles
+      : [...staticArticles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const latestInsights = insightSource.slice(0, 3);
   return <>
     <section className="home-hero">
       <ResponsiveImage src={getPageImage(page)} alt="Professional NYC Cleaning team maintaining a New York commercial property" className="hero-bg" loading="eager" fetchPriority="high" width={1920} height={823} />
@@ -72,6 +84,27 @@ function HomePage({ page }: { page: SitePage }) {
     <section className="section section-navy"><div className="container story-grid"><div className="story-image"><ResponsiveImage src={getPageImage(getPageByPath("/who-we-are/") || page)} alt="NYC Cleaning and Maintenance team serving a New York property" loading="lazy" decoding="async" /><div className="image-note"><strong>Established in 2020</strong><span>Built by property-operations professionals</span></div></div><div className="story-copy"><p className="eyebrow light">A property-minded cleaning partner</p><h2>Clean, safe spaces strengthen New York communities.</h2><p>NYC Cleaning and Maintenance partners with landlords and property managers to deliver dependable cleaning and maintenance, one property at a time.</p><ul className="check-list"><li><CheckCircle2 />Custom schedules around building operations</li><li><CheckCircle2 />Coverage for commercial and residential assets</li><li><CheckCircle2 />Cleaning, waste handling, staffing, and maintenance</li></ul><Link href="/who-we-are/" className="button button-gold">Meet NYC Cleaning</Link></div></div></section>
     <section className="section"><div className="container process-layout"><div><p className="eyebrow">Simple, accountable service</p><h2>From walkthrough to a cleaner property.</h2></div><ol className="process-list"><li><span>01</span><div><h3>Tell us about the property</h3><p>Share the building type, schedule, priorities, and current challenges.</p></div></li><li><span>02</span><div><h3>Review a tailored plan</h3><p>We align services and frequency with your operations and budget.</p></div></li><li><span>03</span><div><h3>Put the team to work</h3><p>Our staff delivers the agreed scope with responsive ongoing support.</p></div></li></ol></div></section>
     <section className="section section-contact"><div className="container contact-band"><div><p className="eyebrow light">Let’s talk about your property</p><h2>Get a cleaning and maintenance plan designed for your building.</h2><p>Send your details and our team will follow up to learn more about your service needs.</p><a href={`tel:${company.phoneHref}`} className="phone-link">{company.phoneDisplay}</a></div><InquiryForm compact sourcePath="/" /></div></section>
+    {latestInsights.length > 0 && (
+      <section className="section section-cream">
+        <div className="container">
+          <div className="section-heading split">
+            <div>
+              <p className="eyebrow">Property insights</p>
+              <h2>The latest guidance from our team.</h2>
+            </div>
+            <p>Practical strategies and property-care insights designed to help New York property managers and facility teams.</p>
+          </div>
+          <div className="article-grid">
+            {latestInsights.map((article, index) => (
+              <ArticleCard key={article.path} article={article} index={index} />
+            ))}
+          </div>
+          <div className="center-action" style={{ marginTop: "clamp(2rem, 4vw, 3.25rem)" }}>
+            <Link href="/blog/" className="button button-navy">View All Insights</Link>
+          </div>
+        </div>
+      </section>
+    )}
   </>;
 }
 
@@ -129,10 +162,10 @@ function LegacyRoute({ path, initialArticle, initialNotFoundPath }: { path: stri
   return <LegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
 }
 
-export function PublicPage({ initialArticle, initialNotFoundPath }: { initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null } = {}) {
+export function PublicPage({ initialArticle, initialNotFoundPath, initialInsights }: { initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null; initialInsights?: InitialPublishedArticle[] } = {}) {
   const [location] = useLocation();
   if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
   const page = getPageByPath(location);
   if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
-  return <><ClientHead page={page} />{page.path === "/" ? <HomePage page={page} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
+  return <><ClientHead page={page} />{page.path === "/" ? <HomePage page={page} initialInsights={initialInsights} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
 }

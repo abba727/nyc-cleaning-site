@@ -12,7 +12,7 @@ import { responsiveMedia } from "./content/responsive-media";
 import { company, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
 import { getArchiveSeo, getLegacySeo, getPageSeo } from "./content/seo";
 import type { LegacyContentPayload } from "./contexts/LegacyContentContext";
-import { getPublishedArticleByPath } from "../../server/db";
+import { getPublishedArticleByPath, listPublishedArticles } from "../../server/db";
 import { toPublicMediaUrl } from "../../server/storage";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
@@ -36,6 +36,23 @@ async function getCmsArticleForRender(pathname: string) {
   }
 }
 
+async function getLatestCmsArticlesForRender() {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const articles = await Promise.race([
+      listPublishedArticles(),
+      new Promise<undefined>(resolve => {
+        timeout = setTimeout(() => resolve(undefined), ARTICLE_LOOKUP_TIMEOUT_MS);
+      }),
+    ]);
+    return articles ? articles.slice(0, 3).map(article => ({ ...article, coverImageUrl: toPublicMediaUrl(article.coverImageUrl) })) : [];
+  } catch {
+    return [];
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export function isKnownPublicPath(url: string) {
   return Boolean(getPageByPath(url) || getLegacyByPath(url) || isBlogArchivePath(url));
 }
@@ -48,6 +65,7 @@ export async function render(url: string) {
   const cmsArticle = !matchedPage && !matchedLegacy && !isSyntheticArchive
     ? await getCmsArticleForRender(pathname)
     : undefined;
+  const initialInsights = pathname === "/" ? await getLatestCmsArticlesForRender() : [];
   const page = matchedPage || pages[0];
   const isNotFound = !matchedPage && !matchedLegacy && !isSyntheticArchive && !cmsArticle;
   const seo = cmsArticle
@@ -66,7 +84,7 @@ export async function render(url: string) {
     <React.StrictMode>
       <Router ssrPath={pathname}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}><App legacyContent={legacyPayload} initialArticle={cmsArticle || null} initialNotFoundPath={isNotFound ? pathname : null} /></QueryClientProvider>
+          <QueryClientProvider client={queryClient}><App legacyContent={legacyPayload} initialArticle={cmsArticle || null} initialNotFoundPath={isNotFound ? pathname : null} initialInsights={initialInsights} /></QueryClientProvider>
         </trpc.Provider>
       </Router>
     </React.StrictMode>
@@ -112,6 +130,9 @@ export async function render(url: string) {
   const initialNotFoundHydration = isNotFound
     ? `<script>window.__INITIAL_NOT_FOUND_PATH__=${safeJson(pathname)};</script>`
     : "";
+  const initialInsightsHydration = initialInsights.length
+    ? `<script>window.__INITIAL_INSIGHTS__=${safeJson(initialInsights)};</script>`
+    : "";
 
   const head = [
     `<title>${escapeHtml(seo.title)}</title>`,
@@ -122,6 +143,7 @@ export async function render(url: string) {
     legacyHydration,
     initialArticleHydration,
     initialNotFoundHydration,
+    initialInsightsHydration,
     `<meta property="og:locale" content="en_US" />`,
     `<meta property="og:type" content="${isArticle || seo.kind === "blog" ? "article" : "website"}" />`,
     `<meta property="og:site_name" content="${escapeHtml(company.name)}" />`,
