@@ -2,6 +2,7 @@ import { type ImgHTMLAttributes, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
+import { ClientDataProvider } from "./ClientDataProvider";
 import LegacyContentPage, { ArticleCard, databaseArticleToView } from "./LegacyContentPage";
 import { trpc } from "@/lib/trpc";
 import { useLegacyContent } from "@/contexts/LegacyContentContext";
@@ -108,6 +109,10 @@ function HomePage({ page, initialInsights }: { page: SitePage; initialInsights?:
   </>;
 }
 
+function HomePageWithData({ page, initialInsights }: { page: SitePage; initialInsights?: InitialPublishedArticle[] }) {
+  return <ClientDataProvider><HomePage page={page} initialInsights={initialInsights} /></ClientDataProvider>;
+}
+
 function ContactPage({ page }: { page: SitePage }) {
   return <><InteriorHero page={page} /><section className="section"><div className="container contact-page-grid"><div><p className="eyebrow">Contact NYC Cleaning</p><h2>Tell us how we can help.</h2><p>Whether you manage an office, residential building, mixed-use property, or commercial facility, we’ll build a plan around your operating needs.</p><div className="contact-details"><a href={`tel:${company.phoneHref}`}><span><Building2 /></span><div><small>Call</small><strong>{company.phoneDisplay}</strong></div></a><a href={`mailto:${company.email}`}><span><Sparkles /></span><div><small>Email</small><strong>{company.email}</strong></div></a><div><span><MapPin /></span><div><small>Mailing address</small><strong>{company.address}</strong></div></div></div></div><InquiryForm sourcePath={page.path} heading="Request a free consultation" /></div></section></>;
 }
@@ -167,5 +172,5 @@ export function PublicPage({ initialArticle, initialNotFoundPath, initialInsight
   if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
   const page = getPageByPath(location);
   if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
-  return <><ClientHead page={page} />{page.path === "/" ? <HomePage page={page} initialInsights={initialInsights} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
+  return <><ClientHead page={page} />{page.path === "/" ? <HomePageWithData page={page} initialInsights={initialInsights} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
 }
