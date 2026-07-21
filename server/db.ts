@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gt, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
 import {
@@ -373,4 +373,12 @@ export async function deleteProjectLocation(id: number) {
   if (!db) throw new Error("Database is not available");
 
   await db.delete(projectLocations).where(eq(projectLocations.id, id));
+}
+
+export async function deleteProjectLocations(ids: number[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  if (ids.length === 0) return;
+
+  await db.delete(projectLocations).where(inArray(projectLocations.id, ids));
 }

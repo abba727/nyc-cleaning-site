@@ -12,6 +12,7 @@ import {
   createProjectLocations,
   deleteArticle,
   deleteProjectLocation,
+  deleteProjectLocations,
   findArticleUrlConflict,
   getInquiryById,
   getPublishedArticleByPath,
@@ -519,6 +520,13 @@ export const appRouter = router({
     remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
       await deleteProjectLocation(input.id);
       return { success: true } as const;
+    }),
+    removeMany: adminProcedure.input(z.object({
+      ids: z.array(z.number().int().positive()).min(1).max(5000),
+    })).mutation(async ({ input }) => {
+      const ids = Array.from(new Set(input.ids));
+      await deleteProjectLocations(ids);
+      return { success: true, removedCount: ids.length } as const;
     }),
     importRows: adminProcedure.input(z.object({
       filename: z.string().trim().min(1).max(255),

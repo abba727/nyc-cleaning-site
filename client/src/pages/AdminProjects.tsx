@@ -40,6 +40,8 @@ const columnAliases = {
   label: ["label", "name", "property", "propertyname", "project", "projectname"],
 };
 
+const LOCATIONS_PER_PAGE = 25;
+
 function normalizeHeader(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -95,6 +97,8 @@ export default function AdminProjects() {
   const [manualLocation, setManualLocation] = useState<ProjectLocationDraft>(emptyLocation);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingLocation, setEditingLocation] = useState<ProjectLocationDraft>(emptyLocation);
+  const [locationPage, setLocationPage] = useState(1);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<Set<number>>(() => new Set());
 
   const locations = trpc.projects.adminList.useQuery();
   const imports = trpc.projects.listImports.useQuery();
@@ -143,10 +147,29 @@ export default function AdminProjects() {
     onError: error => toast.error(error.message || "The service location could not be removed."),
   });
 
+  const removeManyMutation = trpc.projects.removeMany.useMutation({
+    onSuccess: async result => {
+      setSelectedLocationIds(new Set());
+      await invalidateProjects();
+      toast.success(`${result.removedCount} service location${result.removedCount === 1 ? "" : "s"} removed.`);
+    },
+    onError: error => toast.error(error.message || "The selected service locations could not be removed."),
+  });
+
   const activeCount = useMemo(
     () => (locations.data ?? []).filter(location => location.isActive).length,
     [locations.data],
   );
+  const locationCount = locations.data?.length ?? 0;
+  const locationPageCount = Math.max(1, Math.ceil(locationCount / LOCATIONS_PER_PAGE));
+  const currentLocationPage = Math.min(locationPage, locationPageCount);
+  const paginatedLocations = useMemo(() => {
+    const start = (currentLocationPage - 1) * LOCATIONS_PER_PAGE;
+    return (locations.data ?? []).slice(start, start + LOCATIONS_PER_PAGE);
+  }, [currentLocationPage, locations.data]);
+  const allCurrentPageSelected = paginatedLocations.length > 0 && paginatedLocations.every(location => selectedLocationIds.has(location.id));
+  const locationRangeStart = locationCount === 0 ? 0 : (currentLocationPage - 1) * LOCATIONS_PER_PAGE + 1;
+  const locationRangeEnd = Math.min(currentLocationPage * LOCATIONS_PER_PAGE, locationCount);
 
   async function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -251,6 +274,33 @@ export default function AdminProjects() {
     });
   }
 
+  function toggleSelectedLocation(id: number) {
+    setSelectedLocationIds(current => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleCurrentPageSelection() {
+    setSelectedLocationIds(current => {
+      const next = new Set(current);
+      if (allCurrentPageSelected) paginatedLocations.forEach(location => next.delete(location.id));
+      else paginatedLocations.forEach(location => next.add(location.id));
+      return next;
+    });
+  }
+
+  function removeSelectedLocations() {
+    const ids = Array.from(selectedLocationIds);
+    if (ids.length === 0) return;
+    const noun = ids.length === 1 ? "service location" : "service locations";
+    if (window.confirm(`Remove ${ids.length} selected ${noun}? This cannot be undone.`)) {
+      removeManyMutation.mutate({ ids });
+    }
+  }
+
   return (
     <section className="admin-workspace space-y-8">
       <header className="admin-page-heading">
@@ -335,23 +385,46 @@ export default function AdminProjects() {
       </div>
 
       <article className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-2 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-xl font-semibold text-slate-900">Service locations</h2><p className="mt-1 text-sm text-slate-600">Toggle a record off to remove its marker from the public map while keeping it in the CMS.</p></div><span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{locations.data?.length ?? 0} records</span></div>
+        <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="text-xl font-semibold text-slate-900">Service locations</h2><p className="mt-1 text-sm text-slate-600">Browse 25 records at a time. Select one or more locations to remove them together, or hide a location to keep it out of the public map.</p></div>
+          <span className="inline-flex w-fit items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{locationCount} records</span>
+        </div>
         {locations.isLoading ? <div className="flex items-center justify-center gap-2 px-6 py-16 text-slate-600"><Loader2 className="spin" /> Loading locations…</div> : null}
         {locations.error ? <div className="px-6 py-10 text-sm text-red-700">Locations could not be loaded. Refresh the page and try again.</div> : null}
-        {!locations.isLoading && !locations.error && (locations.data?.length ?? 0) === 0 ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-slate-600"><MapPin className="size-8 text-slate-400" /><p className="font-medium text-slate-800">No service locations yet.</p><p className="max-w-md text-sm">Import a CSV or Excel sheet above, or add an address manually. Active records will appear on the Service Area map.</p></div> : null}
-        {!locations.isLoading && !locations.error && (locations.data?.length ?? 0) > 0 ? <div className="divide-y divide-slate-100">{locations.data?.map(location => <div key={location.id} className="px-6 py-5">
-          {editingId === location.id ? <form className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[1.4fr_1fr_0.55fr_0.65fr_auto]" onSubmit={event => { event.preventDefault(); updateMutation.mutate({ id: location.id, ...editingLocation, label: editingLocation.label || undefined, latitude: location.latitude, longitude: location.longitude, isActive: location.isActive }); }}>
-            <Input value={editingLocation.address} onChange={event => setEditingLocation(current => ({ ...current, address: event.target.value }))} aria-label="Street address" required maxLength={512} />
-            <Input value={editingLocation.city} onChange={event => setEditingLocation(current => ({ ...current, city: event.target.value }))} aria-label="City" required maxLength={160} />
-            <Input value={editingLocation.state} onChange={event => setEditingLocation(current => ({ ...current, state: event.target.value }))} aria-label="State" required maxLength={64} />
-            <Input value={editingLocation.zip} onChange={event => setEditingLocation(current => ({ ...current, zip: event.target.value }))} aria-label="ZIP code" required maxLength={24} />
-            <div className="flex gap-2"><Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? <Loader2 className="spin" /> : <CheckCircle2 />} Save</Button><Button type="button" variant="outline" onClick={() => setEditingId(null)} disabled={updateMutation.isPending}>Cancel</Button></div>
-            <label className="grid gap-1.5 text-sm font-medium text-slate-700 lg:col-span-4"><span>Internal label <em className="font-normal text-slate-500">(optional)</em></span><Input value={editingLocation.label} onChange={event => setEditingLocation(current => ({ ...current, label: event.target.value }))} maxLength={255} /></label>
-          </form> : <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-semibold text-slate-900">{location.label || "Service location"}</h3><span className={location.isActive ? "rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800" : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}>{location.isActive ? "Visible on map" : "Hidden from map"}</span></div><p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600"><MapPin className="mt-0.5 size-4 shrink-0" />{fullAddress(location)}</p><p className="mt-1 text-xs text-slate-400">Added {formatDate(location.createdAt)}</p></div>
-            <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => toggleActive(location)} disabled={updateMutation.isPending}>{location.isActive ? <EyeOff className="size-4" /> : <Eye className="size-4" />}{location.isActive ? "Hide" : "Show"}</Button><Button type="button" variant="outline" size="sm" onClick={() => startEditing(location)} disabled={updateMutation.isPending || removeMutation.isPending}><Pencil className="size-4" /> Edit</Button><Button type="button" variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => { if (window.confirm(`Remove ${fullAddress(location)}? This cannot be undone.`)) removeMutation.mutate({ id: location.id }); }} disabled={removeMutation.isPending || updateMutation.isPending}><Trash2 className="size-4" /> Remove</Button></div>
-          </div>}
-        </div>)}</div> : null}
+        {!locations.isLoading && !locations.error && locationCount === 0 ? <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-slate-600"><MapPin className="size-8 text-slate-400" /><p className="font-medium text-slate-800">No service locations yet.</p><p className="max-w-md text-sm">Import a CSV or Excel sheet above, or add an address manually. Active records will appear on the Service Area map.</p></div> : null}
+        {!locations.isLoading && !locations.error && locationCount > 0 ? <>
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <p className="text-sm text-slate-600">Showing <strong className="font-semibold text-slate-800">{locationRangeStart}–{locationRangeEnd}</strong> of <strong className="font-semibold text-slate-800">{locationCount}</strong> locations.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={toggleCurrentPageSelection} disabled={removeManyMutation.isPending}>{allCurrentPageSelected ? "Clear page selection" : "Select page"}</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedLocationIds(new Set((locations.data ?? []).map(location => location.id)))} disabled={removeManyMutation.isPending || selectedLocationIds.size === locationCount}>Select all {locationCount}</Button>
+              {selectedLocationIds.size > 0 ? <Button type="button" variant="outline" size="sm" onClick={() => setSelectedLocationIds(new Set())} disabled={removeManyMutation.isPending}>Clear selection</Button> : null}
+              <Button type="button" variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={removeSelectedLocations} disabled={selectedLocationIds.size === 0 || removeManyMutation.isPending}>{removeManyMutation.isPending ? <Loader2 className="spin" /> : <Trash2 className="size-4" />} Remove {selectedLocationIds.size > 0 ? `${selectedLocationIds.size} selected` : "selected"}</Button>
+            </div>
+          </div>
+          <div className="divide-y divide-slate-100">{paginatedLocations.map(location => <div key={location.id} className="flex gap-3 px-6 py-5">
+            <label className="mt-1.5 flex shrink-0 cursor-pointer items-start">
+              <input type="checkbox" className="size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500" checked={selectedLocationIds.has(location.id)} onChange={() => toggleSelectedLocation(location.id)} disabled={removeManyMutation.isPending} aria-label={`Select ${fullAddress(location)}`} />
+            </label>
+            <div className="min-w-0 flex-1">
+              {editingId === location.id ? <form className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[1.4fr_1fr_0.55fr_0.65fr_auto]" onSubmit={event => { event.preventDefault(); updateMutation.mutate({ id: location.id, ...editingLocation, label: editingLocation.label || undefined, latitude: location.latitude, longitude: location.longitude, isActive: location.isActive }); }}>
+                <Input value={editingLocation.address} onChange={event => setEditingLocation(current => ({ ...current, address: event.target.value }))} aria-label="Street address" required maxLength={512} />
+                <Input value={editingLocation.city} onChange={event => setEditingLocation(current => ({ ...current, city: event.target.value }))} aria-label="City" required maxLength={160} />
+                <Input value={editingLocation.state} onChange={event => setEditingLocation(current => ({ ...current, state: event.target.value }))} aria-label="State" required maxLength={64} />
+                <Input value={editingLocation.zip} onChange={event => setEditingLocation(current => ({ ...current, zip: event.target.value }))} aria-label="ZIP code" required maxLength={24} />
+                <div className="flex gap-2"><Button type="submit" disabled={updateMutation.isPending}>{updateMutation.isPending ? <Loader2 className="spin" /> : <CheckCircle2 />} Save</Button><Button type="button" variant="outline" onClick={() => setEditingId(null)} disabled={updateMutation.isPending}>Cancel</Button></div>
+                <label className="grid gap-1.5 text-sm font-medium text-slate-700 lg:col-span-4"><span>Internal label <em className="font-normal text-slate-500">(optional)</em></span><Input value={editingLocation.label} onChange={event => setEditingLocation(current => ({ ...current, label: event.target.value }))} maxLength={255} /></label>
+              </form> : <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h3 className="truncate font-semibold text-slate-900">{location.label || "Service location"}</h3><span className={location.isActive ? "rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800" : "rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"}>{location.isActive ? "Visible on map" : "Hidden from map"}</span></div><p className="mt-1 flex items-start gap-1.5 text-sm text-slate-600"><MapPin className="mt-0.5 size-4 shrink-0" />{fullAddress(location)}</p><p className="mt-1 text-xs text-slate-400">Added {formatDate(location.createdAt)}</p></div>
+                <div className="flex flex-wrap gap-2"><Button type="button" variant="outline" size="sm" onClick={() => toggleActive(location)} disabled={updateMutation.isPending || removeManyMutation.isPending}>{location.isActive ? <EyeOff className="size-4" /> : <Eye className="size-4" />}{location.isActive ? "Hide" : "Show"}</Button><Button type="button" variant="outline" size="sm" onClick={() => startEditing(location)} disabled={updateMutation.isPending || removeMutation.isPending || removeManyMutation.isPending}><Pencil className="size-4" /> Edit</Button><Button type="button" variant="outline" size="sm" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800" onClick={() => { if (window.confirm(`Remove ${fullAddress(location)}? This cannot be undone.`)) removeMutation.mutate({ id: location.id }); }} disabled={removeMutation.isPending || removeManyMutation.isPending || updateMutation.isPending}><Trash2 className="size-4" /> Remove</Button></div>
+              </div>}
+            </div>
+          </div>)}</div>
+          <div className="flex flex-col gap-3 border-t border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-slate-600">Page {currentLocationPage} of {locationPageCount}</p>
+            <div className="flex gap-2"><Button type="button" variant="outline" size="sm" onClick={() => setLocationPage(page => Math.max(1, page - 1))} disabled={currentLocationPage === 1}>Previous</Button><Button type="button" variant="outline" size="sm" onClick={() => setLocationPage(page => Math.min(locationPageCount, page + 1))} disabled={currentLocationPage === locationPageCount}>Next</Button></div>
+          </div>
+        </> : null}
       </article>
 
       <article className="rounded-2xl border border-slate-200 bg-white shadow-sm">
