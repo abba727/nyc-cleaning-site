@@ -1,158 +1,133 @@
-/**
- * GOOGLE MAPS FRONTEND INTEGRATION - ESSENTIAL GUIDE
- *
- * USAGE FROM PARENT COMPONENT:
- * ======
- *
- * const mapRef = useRef<google.maps.Map | null>(null);
- *
- * <MapView
- *   initialCenter={{ lat: 40.7128, lng: -74.0060 }}
- *   initialZoom={15}
- *   onMapReady={(map) => {
- *     mapRef.current = map; // Store to control map from parent anytime, google map itself is in charge of the re-rendering, not react state.
- * </MapView>
- *
- * ======
- * Available Libraries and Core Features:
- * -------------------------------
- * 📍 MARKER (from `marker` library)
- * - Attaches to map using { map, position }
- * new google.maps.marker.AdvancedMarkerElement({
- *   map,
- *   position: { lat: 37.7749, lng: -122.4194 },
- *   title: "San Francisco",
- * });
- *
- * -------------------------------
- * 🏢 PLACES (from `places` library)
- * - Does not attach directly to map; use data with your map manually.
- * const place = new google.maps.places.Place({ id: PLACE_ID });
- * await place.fetchFields({ fields: ["displayName", "location"] });
- * map.setCenter(place.location);
- * new google.maps.marker.AdvancedMarkerElement({ map, position: place.location });
- *
- * -------------------------------
- * 🧭 GEOCODER (from `geocoding` library)
- * - Standalone service; manually apply results to map.
- * const geocoder = new google.maps.Geocoder();
- * geocoder.geocode({ address: "New York" }, (results, status) => {
- *   if (status === "OK" && results[0]) {
- *     map.setCenter(results[0].geometry.location);
- *     new google.maps.marker.AdvancedMarkerElement({
- *       map,
- *       position: results[0].geometry.location,
- *     });
- *   }
- * });
- *
- * -------------------------------
- * 📐 GEOMETRY (from `geometry` library)
- * - Pure utility functions; not attached to map.
- * const dist = google.maps.geometry.spherical.computeDistanceBetween(p1, p2);
- *
- * -------------------------------
- * 🛣️ ROUTES (from `routes` library)
- * - Combines DirectionsService (standalone) + DirectionsRenderer (map-attached)
- * const directionsService = new google.maps.DirectionsService();
- * const directionsRenderer = new google.maps.DirectionsRenderer({ map });
- * directionsService.route(
- *   { origin, destination, travelMode: "DRIVING" },
- *   (res, status) => status === "OK" && directionsRenderer.setDirections(res)
- * );
- *
- * -------------------------------
- * 🌦️ MAP LAYERS (attach directly to map)
- * - new google.maps.TrafficLayer().setMap(map);
- * - new google.maps.TransitLayer().setMap(map);
- * - new google.maps.BicyclingLayer().setMap(map);
- *
- * -------------------------------
- * ✅ SUMMARY
- * - “map-attached” → AdvancedMarkerElement, DirectionsRenderer, Layers.
- * - “standalone” → Geocoder, DirectionsService, DistanceMatrixService, ElevationService.
- * - “data-only” → Place, Geometry utilities.
- */
-
-/// <reference types="@types/google.maps" />
-
-import { useEffect, useRef } from "react";
-import { usePersistFn } from "@/hooks/usePersistFn";
+import { useEffect, useRef, useState } from "react";
+import type * as Leaflet from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 
-declare global {
-  interface Window {
-    google?: typeof google;
-  }
-}
-
-const clientEnv = ("env" in import.meta
-  ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
-  : undefined);
-const API_KEY = clientEnv?.VITE_FRONTEND_FORGE_API_KEY;
-const FORGE_BASE_URL =
-  clientEnv?.VITE_FRONTEND_FORGE_API_URL ||
-  "https://forge.butterfly-effect.dev";
-const MAPS_PROXY_URL = `${FORGE_BASE_URL}/v1/maps/proxy`;
-
-function loadMapScript() {
-  return new Promise(resolve => {
-    const script = document.createElement("script");
-    script.src = `${MAPS_PROXY_URL}/maps/api/js?key=${API_KEY}&v=weekly&libraries=marker,places,geocoding,geometry`;
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.onload = () => {
-      resolve(null);
-      script.remove(); // Clean up immediately
-    };
-    script.onerror = () => {
-      console.error("Failed to load Google Maps script");
-    };
-    document.head.appendChild(script);
-  });
-}
+export type MapMarker = {
+  id: number;
+  latitude: number;
+  longitude: number;
+  title: string;
+};
 
 interface MapViewProps {
   className?: string;
-  initialCenter?: google.maps.LatLngLiteral;
+  initialCenter?: Leaflet.LatLngExpression;
   initialZoom?: number;
-  onMapReady?: (map: google.maps.Map) => void;
+  markers?: MapMarker[];
+  onMapReady?: (map: Leaflet.Map) => void;
+  onMapError?: () => void;
 }
 
+const NYC_CENTER: Leaflet.LatLngExpression = [40.7128, -74.006];
+const SERVICE_MARKER_STYLE: Leaflet.CircleMarkerOptions = {
+  radius: 5,
+  color: "#08243d",
+  weight: 1.5,
+  fillColor: "#56c9c3",
+  fillOpacity: 0.95,
+};
+
+/**
+ * A public map renderer with no browser API key. Leaflet is loaded only in the
+ * browser so server-rendered pages and metadata do not depend on browser APIs.
+ */
 export function MapView({
   className,
-  initialCenter = { lat: 37.7749, lng: -122.4194 },
-  initialZoom = 12,
+  initialCenter = NYC_CENTER,
+  initialZoom = 11,
+  markers = [],
   onMapReady,
+  onMapError,
 }: MapViewProps) {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<google.maps.Map | null>(null);
-
-  const init = usePersistFn(async () => {
-    await loadMapScript();
-    if (!mapContainer.current) {
-      console.error("Map container not found");
-      return;
-    }
-    map.current = new window.google.maps.Map(mapContainer.current, {
-      zoom: initialZoom,
-      center: initialCenter,
-      mapTypeControl: true,
-      fullscreenControl: true,
-      zoomControl: true,
-      streetViewControl: true,
-      mapId: "DEMO_MAP_ID",
-    });
-    if (onMapReady) {
-      onMapReady(map.current);
-    }
-  });
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<Leaflet.Map | null>(null);
+  const markerLayerRef = useRef<Leaflet.LayerGroup | null>(null);
+  const onMapReadyRef = useRef(onMapReady);
+  const onMapErrorRef = useRef(onMapError);
+  const [mapVersion, setMapVersion] = useState(0);
 
   useEffect(() => {
-    init();
-  }, [init]);
+    onMapReadyRef.current = onMapReady;
+    onMapErrorRef.current = onMapError;
+  }, [onMapError, onMapReady]);
 
-  return (
-    <div ref={mapContainer} className={cn("w-full h-[500px]", className)} />
-  );
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || mapRef.current) return;
+    let disposed = false;
+
+    void import("leaflet")
+      .then(({ default: L }) => {
+        if (disposed || mapRef.current) return;
+
+        const map = L.map(container, {
+          center: initialCenter,
+          zoom: initialZoom,
+          scrollWheelZoom: false,
+          zoomControl: true,
+          attributionControl: true,
+        });
+        mapRef.current = map;
+        markerLayerRef.current = L.layerGroup().addTo(map);
+
+        const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+          crossOrigin: true,
+        });
+        tiles.on("tileerror", () => onMapErrorRef.current?.());
+        tiles.addTo(map);
+        onMapReadyRef.current?.(map);
+        setMapVersion(version => version + 1);
+      })
+      .catch(() => onMapErrorRef.current?.());
+
+    return () => {
+      disposed = true;
+      markerLayerRef.current = null;
+      mapRef.current?.remove();
+      mapRef.current = null;
+    };
+  // The initial view is intentionally applied once; marker updates manage later bounds.
+  // This avoids tearing down the map when a parent rerenders with an equivalent array.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialZoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const markerLayer = markerLayerRef.current;
+    if (!map || !markerLayer) return;
+
+    markerLayer.clearLayers();
+    const validMarkers = markers.filter(marker => (
+      Number.isFinite(marker.latitude)
+      && Number.isFinite(marker.longitude)
+      && marker.latitude >= -90
+      && marker.latitude <= 90
+      && marker.longitude >= -180
+      && marker.longitude <= 180
+    ));
+
+    void import("leaflet").then(({ default: L }) => {
+      if (mapRef.current !== map || markerLayerRef.current !== markerLayer) return;
+
+      for (const marker of validMarkers) {
+        L.circleMarker([marker.latitude, marker.longitude], SERVICE_MARKER_STYLE)
+          .bindTooltip(marker.title, { direction: "top", opacity: 0.95 })
+          .addTo(markerLayer);
+      }
+
+      if (validMarkers.length === 1) {
+        map.setView([validMarkers[0].latitude, validMarkers[0].longitude], 14);
+      } else if (validMarkers.length > 1) {
+        const bounds = L.latLngBounds(validMarkers.map(marker => [marker.latitude, marker.longitude] as Leaflet.LatLngTuple));
+        map.fitBounds(bounds.pad(0.1), { padding: [48, 48], maxZoom: 13 });
+      }
+
+      window.setTimeout(() => map.invalidateSize(), 0);
+    }).catch(() => onMapErrorRef.current?.());
+  }, [markers, mapVersion]);
+
+  return <div ref={containerRef} className={cn("h-[500px] w-full", className)} aria-label="Map of NYC Cleaning service locations" role="region" />;
 }

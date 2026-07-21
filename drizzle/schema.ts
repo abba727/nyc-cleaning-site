@@ -203,8 +203,8 @@ export type InsertProjectImport = typeof projectImports.$inferInsert;
 
 /**
  * Addresses of active or historical properties serviced by NYC Cleaning.
- * Coordinates are optional because the public map can geocode imported addresses
- * when a row does not yet contain a stored location.
+ * Coordinates remain optional when an address cannot be resolved, while the server
+ * enriches valid imports before the public map renders them.
  */
 export const projectLocations = mysqlTable("projectLocations", {
   id: int("id").autoincrement().primaryKey(),

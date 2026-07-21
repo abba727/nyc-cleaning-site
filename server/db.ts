@@ -320,6 +320,26 @@ export async function listProjectLocations() {
     .orderBy(desc(projectLocations.updatedAt), desc(projectLocations.id));
 }
 
+export async function listActiveProjectLocationsMissingCoordinates() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  return db
+    .select({
+      id: projectLocations.id,
+      address: projectLocations.address,
+      city: projectLocations.city,
+      state: projectLocations.state,
+      zip: projectLocations.zip,
+    })
+    .from(projectLocations)
+    .where(and(
+      eq(projectLocations.isActive, true),
+      or(isNull(projectLocations.latitude), isNull(projectLocations.longitude)),
+    ))
+    .orderBy(asc(projectLocations.id));
+}
+
 export async function listProjectImports() {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
@@ -366,6 +386,26 @@ export async function updateProjectLocation(
   if (!db) throw new Error("Database is not available");
 
   await db.update(projectLocations).set(input).where(eq(projectLocations.id, id));
+}
+
+export async function updateProjectLocationCoordinates(
+  locations: Array<{ id: number; latitude: number; longitude: number }>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  if (locations.length === 0) return;
+
+  await db.transaction(async transaction => {
+    for (const location of locations) {
+      await transaction
+        .update(projectLocations)
+        .set({ latitude: location.latitude, longitude: location.longitude })
+        .where(and(
+          eq(projectLocations.id, location.id),
+          or(isNull(projectLocations.latitude), isNull(projectLocations.longitude)),
+        ));
+    }
+  });
 }
 
 export async function deleteProjectLocation(id: number) {

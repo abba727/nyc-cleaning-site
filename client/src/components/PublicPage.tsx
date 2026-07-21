@@ -1,4 +1,4 @@
-import { type ImgHTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
+import { type ImgHTMLAttributes, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
@@ -253,105 +253,49 @@ type ServiceMapLocation = {
   longitude: number | null;
 };
 
-function mapAddress(location: ServiceMapLocation) {
-  return `${location.address}, ${location.city}, ${location.state} ${location.zip}, USA`;
-}
-
 function ServiceAreaMap() {
   const locations = trpc.projects.listLocations.useQuery(undefined, { retry: false });
-  const mapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const renderVersion = useRef(0);
-  const [mapReady, setMapReady] = useState(false);
-  const [mapMessage, setMapMessage] = useState("Loading service locations…");
+  const [mapTilesUnavailable, setMapTilesUnavailable] = useState(false);
+  const locationData = (locations.data ?? []) as ServiceMapLocation[];
+  const markers = locationData.flatMap(location => (
+    location.latitude !== null && location.longitude !== null
+      ? [{
+          id: location.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          title: location.label || `${location.address}, ${location.city}, ${location.state} ${location.zip}`,
+        }]
+      : []
+  ));
+  const unresolvedCount = locationData.length - markers.length;
 
-  const clearMarkers = useCallback(() => {
-    markerRef.current.forEach(marker => { marker.map = null; });
-    markerRef.current = [];
-  }, []);
+  let mapMessage = "Loading service locations…";
+  if (locations.isError) {
+    mapMessage = "Service-area locations are temporarily unavailable. Please check back shortly.";
+  } else if (!locations.isLoading && locationData.length === 0) {
+    mapMessage = "Service locations will appear here as they are added to the NYC Cleaning CMS.";
+  } else if (!locations.isLoading && markers.length > 0) {
+    mapMessage = unresolvedCount > 0
+      ? `Showing ${markers.length} active service location${markers.length === 1 ? "" : "s"}. ${unresolvedCount} address${unresolvedCount === 1 ? " is" : "es are"} still being prepared.`
+      : `Showing ${markers.length} active service location${markers.length === 1 ? "" : "s"} across New York City.`;
+  } else if (!locations.isLoading) {
+    mapMessage = "Service locations are being prepared for the map.";
+  }
 
-  const renderMarkers = useCallback(async () => {
-    const map = mapRef.current;
-    const maps = window.google?.maps;
-    if (!map || !maps || !locations.data) return;
-
-    const version = ++renderVersion.current;
-    clearMarkers();
-    if (locations.data.length === 0) {
-      setMapMessage("Service locations will appear here as they are added to the NYC Cleaning CMS.");
-      return;
-    }
-
-    const bounds = new maps.LatLngBounds();
-    let placed = 0;
-    let unresolved = 0;
-    const addMarker = (position: google.maps.LatLng | google.maps.LatLngLiteral, title: string) => {
-      const marker = new maps.marker.AdvancedMarkerElement({
-        map,
-        position,
-        title,
-      });
-      markerRef.current.push(marker);
-      bounds.extend(position);
-      placed += 1;
-    };
-
-    for (const location of locations.data as ServiceMapLocation[]) {
-      if (version !== renderVersion.current) return;
-      if (location.latitude !== null && location.longitude !== null) {
-        addMarker({ lat: location.latitude, lng: location.longitude }, location.label || mapAddress(location));
-        continue;
-      }
-      try {
-        const geocoder = new maps.Geocoder();
-        const response = await geocoder.geocode({ address: mapAddress(location), region: "US" });
-        if (version !== renderVersion.current) return;
-        const result = response.results[0];
-        if (result?.geometry.location) addMarker(result.geometry.location, location.label || mapAddress(location));
-        else unresolved += 1;
-      } catch {
-        unresolved += 1;
-      }
-    }
-
-    if (version !== renderVersion.current) return;
-    if (placed === 1) {
-      map.setCenter(bounds.getCenter());
-      map.setZoom(13);
-    } else if (placed > 1) {
-      map.fitBounds(bounds, 72);
-    }
-    setMapMessage(unresolved > 0
-      ? `Showing ${placed} service location${placed === 1 ? "" : "s"}. ${unresolved} address${unresolved === 1 ? " could" : "es could"} not be mapped.`
-      : `Showing ${placed} active service location${placed === 1 ? "" : "s"} across New York City.`);
-  }, [clearMarkers, locations.data]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    void renderMarkers();
-  }, [mapReady, renderMarkers]);
-
-  useEffect(() => () => {
-    renderVersion.current += 1;
-    clearMarkers();
-  }, [clearMarkers]);
-
-  useEffect(() => {
-    if (locations.isError) setMapMessage("Service-area markers are temporarily unavailable. Please check back shortly.");
-  }, [locations.isError]);
+  if (mapTilesUnavailable && markers.length > 0) {
+    mapMessage = "Map details are temporarily unavailable, but the service-location markers have loaded.";
+  }
 
   return <div className="map-container" style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--border)", background: "var(--background)", minHeight: "600px", position: "relative" }}>
     <MapView
       className="h-[600px]"
-      initialCenter={{ lat: 40.7128, lng: -74.0060 }}
+      initialCenter={[40.7128, -74.0060]}
       initialZoom={11}
-      onMapReady={map => {
-        mapRef.current = map;
-        setMapReady(true);
-      }}
+      markers={markers}
+      onMapError={() => setMapTilesUnavailable(true)}
     />
     <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-xl border border-white/80 bg-white/95 px-4 py-3 text-sm text-slate-700 shadow-lg backdrop-blur sm:left-6 sm:right-auto">
-      <div className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-gold" /><span>{locations.isLoading ? "Loading service locations…" : mapMessage}</span></div>
+      <div className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-gold" /><span>{mapMessage}</span></div>
     </div>
   </div>;
 }

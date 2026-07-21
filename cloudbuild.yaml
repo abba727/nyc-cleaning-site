@@ -66,7 +66,7 @@ steps:
       - --set-cloudsql-instances=${_CLOUD_SQL_CONNECTION}
       - --command=node
       - --args=scripts/bootstrap-project-tables.mjs
-      - --set-env-vars=NODE_ENV=production,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},MYSQL_UNIX_SOCKET=/cloudsql/${_CLOUD_SQL_CONNECTION}
+      - --set-env-vars=NODE_ENV=production,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},MYSQL_UNIX_SOCKET=/cloudsql/${_CLOUD_SQL_CONNECTION},GEOCODE_PENDING_PROJECT_LOCATIONS=true
       - --set-secrets=DB_PASS=${_DB_PASS_SECRET}:latest
       - --max-retries=1
       - --task-timeout=10m

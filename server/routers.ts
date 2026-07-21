@@ -17,6 +17,7 @@ import {
   getInquiryById,
   getPublishedArticleByPath,
   listActiveProjectLocations,
+  listActiveProjectLocationsMissingCoordinates,
   listAllArticles,
   listInquiries,
   listProjectImports,
@@ -29,7 +30,9 @@ import {
   updateInquiryStatus,
   updateProjectImport,
   updateProjectLocation,
+  updateProjectLocationCoordinates,
 } from "./db";
+import { geocodeProjectLocations } from "./projectGeocoding";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
@@ -215,6 +218,53 @@ function normalizeProjectLocation(input: z.infer<typeof projectLocationInput>) {
     ...input,
     label: input.label?.trim() || null,
   };
+}
+
+type NormalizedProjectLocation = ReturnType<typeof normalizeProjectLocation>;
+
+async function enrichProjectLocationsWithCoordinates(
+  locations: NormalizedProjectLocation[],
+  options: { force?: boolean } = {},
+) {
+  const candidates = locations
+    .map((location, index) => ({ location, index }))
+    .filter(({ location }) => options.force || location.latitude == null || location.longitude == null);
+  if (candidates.length === 0) return locations;
+
+  try {
+    const coordinates = await geocodeProjectLocations(candidates.map(({ location, index }) => ({
+      id: index,
+      address: location.address,
+      city: location.city,
+      state: location.state,
+      zip: location.zip,
+    })));
+    const byIndex = new Map(coordinates.map(location => [location.id, location]));
+
+    return locations.map((location, index) => {
+      const coordinate = byIndex.get(index);
+      return coordinate
+        ? { ...location, latitude: coordinate.latitude, longitude: coordinate.longitude }
+        : location;
+    });
+  } catch (error) {
+    console.error("[Projects] Census coordinate enrichment failed; saving locations without new coordinates.", error);
+    return locations;
+  }
+}
+
+async function backfillMissingProjectCoordinates() {
+  const missingLocations = await listActiveProjectLocationsMissingCoordinates();
+  if (missingLocations.length === 0) return { requestedCount: 0, geocodedCount: 0 };
+
+  try {
+    const coordinates = await geocodeProjectLocations(missingLocations);
+    await updateProjectLocationCoordinates(coordinates);
+    return { requestedCount: missingLocations.length, geocodedCount: coordinates.length };
+  } catch (error) {
+    console.error("[Projects] Census coordinate backfill failed.", error);
+    return { requestedCount: missingLocations.length, geocodedCount: 0 };
+  }
 }
 
 async function ensureArticleUrlAvailable(input: { path: string; slug: string }, excludeId?: number) {
@@ -502,8 +552,9 @@ export const appRouter = router({
     adminList: adminProcedure.query(() => listProjectLocations()),
     listImports: adminProcedure.query(() => listProjectImports()),
     create: adminProcedure.input(projectLocationInput).mutation(async ({ input }) => {
+      const [location] = await enrichProjectLocationsWithCoordinates([normalizeProjectLocation(input)]);
       await createProjectLocations([{
-        ...normalizeProjectLocation(input),
+        ...location,
         isActive: true,
         importBatchId: null,
       }]);
@@ -511,8 +562,11 @@ export const appRouter = router({
     }),
     update: adminProcedure.input(projectLocationUpdateInput).mutation(async ({ input }) => {
       const { id, isActive, ...location } = input;
+      const [enrichedLocation] = await enrichProjectLocationsWithCoordinates([
+        normalizeProjectLocation({ ...location, latitude: null, longitude: null }),
+      ], { force: true });
       await updateProjectLocation(id, {
-        ...normalizeProjectLocation(location),
+        ...enrichedLocation,
         isActive,
       });
       return { success: true } as const;
@@ -527,6 +581,10 @@ export const appRouter = router({
       const ids = Array.from(new Set(input.ids));
       await deleteProjectLocations(ids);
       return { success: true, removedCount: ids.length } as const;
+    }),
+    backfillCoordinates: adminProcedure.mutation(async () => {
+      const result = await backfillMissingProjectCoordinates();
+      return { success: true, ...result } as const;
     }),
     importRows: adminProcedure.input(z.object({
       filename: z.string().trim().min(1).max(255),
@@ -571,7 +629,8 @@ export const appRouter = router({
       });
 
       try {
-        await createProjectLocations(rows.map(row => ({
+        const enrichedRows = await enrichProjectLocationsWithCoordinates(rows);
+        await createProjectLocations(enrichedRows.map(row => ({
           ...row,
           isActive: true,
           importBatchId: importId,
