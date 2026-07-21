@@ -330,6 +330,7 @@ p { margin: 0 0 1.2rem; }
 .pagination-button-direction { min-width: auto; }
 .insights-services-section { border-top: 1px solid #e4dcd0; }
 .insights-services-section .section-heading { margin-bottom: clamp(1.8rem, 3vw, 2.6rem); }
+.insights-more-section { background: var(--white); border-top: 1px solid #dce5e4; }
 .insights-services-cta { display: flex; align-items: center; justify-content: center; gap: 1.4rem; margin-top: clamp(2rem, 4vw, 3.25rem); }
 .archive-browser { display: grid; grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr); gap: clamp(2.5rem, 7vw, 6rem); align-items: start; }
 .archive-browser h2 { margin-bottom: 1rem; font-size: clamp(2rem, 4vw, 3.5rem); }
