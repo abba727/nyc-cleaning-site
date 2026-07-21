@@ -41,6 +41,14 @@ const matchingActual = {
 };
 
 assert.deepEqual(compareSchemaToSnapshot(matchingActual, snapshot), []);
+assert.equal(__testOnly.tableSetDistance(matchingActual, snapshot), 0);
+
+const missingTableActual = { tables: new Map() };
+assert.equal(__testOnly.tableSetDistance(missingTableActual, snapshot), 1);
+
+const extraTableActual = structuredClone(matchingActual);
+extraTableActual.tables.set("unexpected", { columns: [], indexes: [], foreignKeys: [] });
+assert.equal(__testOnly.tableSetDistance(extraTableActual, snapshot), 1);
 
 const driftedActual = structuredClone(matchingActual);
 driftedActual.tables.get("example").columns[1].default = "1";
