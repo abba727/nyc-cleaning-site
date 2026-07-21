@@ -10,6 +10,7 @@ vi.mock("./_core/env", () => ({
   ENV: {
     resendApiKey: "test-key",
     resendFromEmail: "NYC Cleaning <cms@nyccleaning.co>",
+    primaryAdminEmail: "info@nyccleaning.co",
   },
 }));
 
@@ -47,7 +48,7 @@ describe("inquiry emails", () => {
   it("routes every website inquiry to the company inbox with the submitter as reply-to", async () => {
     await sendInquiryNotification({ inquiryId: 731, inquiryType: "quote", name: "Jordan Rivera", email: "jordan@example.com", phone: "(212) 555-0198", serviceType: "Commercial Cleaning", message: "Please contact me about weekday office cleaning.", sourcePath: "/commercial-cleaning-services/" });
     const payload = sendMock.mock.calls[0][0] as { to: string; replyTo: string; subject: string; text: string; html: string };
-    expect(payload.to).toBe("info@fcmre.com");
+    expect(payload.to).toBe("info@nyccleaning.co");
     expect(payload.replyTo).toBe("jordan@example.com");
     expect(payload.subject).toContain("Jordan Rivera");
     expect(payload.text).toContain("(212) 555-0198");

@@ -14,6 +14,7 @@ const AdminRegister = lazy(() => import("@/pages/AdminRegister"));
 const AdminResetPassword = lazy(() => import("@/pages/AdminResetPassword"));
 const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
 const AdminInquiries = lazy(() => import("@/pages/AdminInquiries"));
+const AdminProjects = lazy(() => import("@/pages/AdminProjects"));
 
 function AdminLoadingBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={<DashboardLayoutSkeleton />}>{children}</Suspense>;
@@ -33,6 +34,7 @@ function AdminRoutes() {
     <Route path="/admin/reset-password"><AdminLoadingBoundary><AdminResetPassword /></AdminLoadingBoundary></Route>
     <Route path="/admin/users"><AdminLoadingBoundary><DashboardLayout><AdminUsers /></DashboardLayout></AdminLoadingBoundary></Route>
     <Route path="/admin/inquiries"><AdminLoadingBoundary><DashboardLayout><AdminInquiries /></DashboardLayout></AdminLoadingBoundary></Route>
+    <Route path="/admin/projects"><AdminLoadingBoundary><DashboardLayout><AdminProjects /></DashboardLayout></AdminLoadingBoundary></Route>
     <Route path="/admin/articles"><Redirect to="/admin" /></Route>
     <Route path="/admin"><AdminEntry /></Route>
   </Switch>;

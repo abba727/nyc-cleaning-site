@@ -1,7 +1,8 @@
-import { type ImgHTMLAttributes, useEffect } from "react";
+import { type ImgHTMLAttributes, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
+import { MapView } from "./Map";
 import { ClientDataProvider } from "./ClientDataProvider";
 import LegacyContentPage, { ArticleCard, databaseArticleToView } from "./LegacyContentPage";
 import { trpc } from "@/lib/trpc";
@@ -163,6 +164,245 @@ function ServiceDetailPage({ page }: { page: SitePage }) {
   </>;
 }
 
+function WhoWeArePage({ page }: { page: SitePage }) {
+  const paragraphs = pageParagraphs(page);
+  return <>
+    <InteriorHero page={page} />
+    <section className="section">
+      <div className="container story-grid">
+        <div className="story-copy">
+          <p className="eyebrow">Founded in 2020</p>
+          <h2>Property care built by property professionals.</h2>
+          <p className="lead">{paragraphs[0]}</p>
+          <p>{paragraphs[1]}</p>
+        </div>
+        <div className="story-image">
+          <ResponsiveImage src={getPageImage(page)} alt="NYC Cleaning and Maintenance team serving a New York property" loading="lazy" decoding="async" />
+          <div className="image-note">
+            <strong>Ibrahim Jalloh</strong>
+            <span>Founder & CEO</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section className="section section-navy">
+      <div className="container">
+        <blockquote className="founder-quote">
+          <p>"We understand what property managers face because we’ve been there. Our goal is to take the friction out of facility care so you can focus on your tenants and your business."</p>
+          <footer>— Ibrahim Jalloh, Founder</footer>
+        </blockquote>
+      </div>
+    </section>
+
+    <section className="section">
+      <div className="container">
+        <div className="section-heading split">
+          <div>
+            <p className="eyebrow">Our commitment</p>
+            <h2>Dependable service across New York City.</h2>
+          </div>
+          <p>We bring over 20 years of combined industry experience to every property we maintain, delivering consistent results that strengthen our local communities.</p>
+        </div>
+        <div className="trust-grid" style={{ marginTop: "clamp(2rem, 4vw, 3rem)", borderTop: "1px solid var(--border)", paddingTop: "clamp(2rem, 4vw, 3rem)" }}>
+          <div>
+            <BadgeCheck aria-hidden="true" className="text-brand-gold" size={32} />
+            <strong style={{ fontSize: "1.25rem", display: "block", margin: "1rem 0 0.25rem" }}>20+ Years</strong>
+            <span className="text-muted">Combined leadership experience</span>
+          </div>
+          <div>
+            <Users aria-hidden="true" className="text-brand-gold" size={32} />
+            <strong style={{ fontSize: "1.25rem", display: "block", margin: "1rem 0 0.25rem" }}>Local Teams</strong>
+            <span className="text-muted">Trained staff from our communities</span>
+          </div>
+          <div>
+            <Building2 aria-hidden="true" className="text-brand-gold" size={32} />
+            <strong style={{ fontSize: "1.25rem", display: "block", margin: "1rem 0 0.25rem" }}>Complete Care</strong>
+            <span className="text-muted">From deep cleaning to maintenance</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section className="section section-cream">
+      <div className="container">
+        <div className="section-heading split">
+          <div>
+            <p className="eyebrow">Capabilities</p>
+            <h2>Complete property support.</h2>
+          </div>
+          <p>Explore the services we deliver to commercial and residential buildings across the five boroughs.</p>
+        </div>
+        <ServiceCards limit={3} />
+        <div className="center-action" style={{ marginTop: "clamp(2rem, 4vw, 3.25rem)" }}>
+          <Link href="/cleaning-service-nyc/" className="button button-navy">View All Services</Link>
+        </div>
+      </div>
+    </section>
+  </>;
+}
+
+type ServiceMapLocation = {
+  id: number;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  label: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+function mapAddress(location: ServiceMapLocation) {
+  return `${location.address}, ${location.city}, ${location.state} ${location.zip}, USA`;
+}
+
+function ServiceAreaMap() {
+  const locations = trpc.projects.listLocations.useQuery(undefined, { retry: false });
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const renderVersion = useRef(0);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapMessage, setMapMessage] = useState("Loading service locations…");
+
+  const clearMarkers = useCallback(() => {
+    markerRef.current.forEach(marker => { marker.map = null; });
+    markerRef.current = [];
+  }, []);
+
+  const renderMarkers = useCallback(async () => {
+    const map = mapRef.current;
+    const maps = window.google?.maps;
+    if (!map || !maps || !locations.data) return;
+
+    const version = ++renderVersion.current;
+    clearMarkers();
+    if (locations.data.length === 0) {
+      setMapMessage("Service locations will appear here as they are added to the NYC Cleaning CMS.");
+      return;
+    }
+
+    const bounds = new maps.LatLngBounds();
+    let placed = 0;
+    let unresolved = 0;
+    const addMarker = (position: google.maps.LatLng | google.maps.LatLngLiteral, title: string) => {
+      const marker = new maps.marker.AdvancedMarkerElement({
+        map,
+        position,
+        title,
+      });
+      markerRef.current.push(marker);
+      bounds.extend(position);
+      placed += 1;
+    };
+
+    for (const location of locations.data as ServiceMapLocation[]) {
+      if (version !== renderVersion.current) return;
+      if (location.latitude !== null && location.longitude !== null) {
+        addMarker({ lat: location.latitude, lng: location.longitude }, location.label || mapAddress(location));
+        continue;
+      }
+      try {
+        const geocoder = new maps.Geocoder();
+        const response = await geocoder.geocode({ address: mapAddress(location), region: "US" });
+        if (version !== renderVersion.current) return;
+        const result = response.results[0];
+        if (result?.geometry.location) addMarker(result.geometry.location, location.label || mapAddress(location));
+        else unresolved += 1;
+      } catch {
+        unresolved += 1;
+      }
+    }
+
+    if (version !== renderVersion.current) return;
+    if (placed === 1) {
+      map.setCenter(bounds.getCenter());
+      map.setZoom(13);
+    } else if (placed > 1) {
+      map.fitBounds(bounds, 72);
+    }
+    setMapMessage(unresolved > 0
+      ? `Showing ${placed} service location${placed === 1 ? "" : "s"}. ${unresolved} address${unresolved === 1 ? " could" : "es could"} not be mapped.`
+      : `Showing ${placed} active service location${placed === 1 ? "" : "s"} across New York City.`);
+  }, [clearMarkers, locations.data]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    void renderMarkers();
+  }, [mapReady, renderMarkers]);
+
+  useEffect(() => () => {
+    renderVersion.current += 1;
+    clearMarkers();
+  }, [clearMarkers]);
+
+  useEffect(() => {
+    if (locations.isError) setMapMessage("Service-area markers are temporarily unavailable. Please check back shortly.");
+  }, [locations.isError]);
+
+  return <div className="map-container" style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--border)", background: "var(--background)", minHeight: "600px", position: "relative" }}>
+    <MapView
+      className="h-[600px]"
+      initialCenter={{ lat: 40.7128, lng: -74.0060 }}
+      initialZoom={11}
+      onMapReady={map => {
+        mapRef.current = map;
+        setMapReady(true);
+      }}
+    />
+    <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-xl border border-white/80 bg-white/95 px-4 py-3 text-sm text-slate-700 shadow-lg backdrop-blur sm:left-6 sm:right-auto">
+      <div className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-gold" /><span>{locations.isLoading ? "Loading service locations…" : mapMessage}</span></div>
+    </div>
+  </div>;
+}
+
+function ServiceAreaPage({ page }: { page: SitePage }) {
+  return <>
+    <InteriorHero page={page} />
+    <section className="section">
+      <div className="container contact-page-grid">
+        <div>
+          <p className="eyebrow">Contact NYC Cleaning</p>
+          <h2>Tell us how we can help.</h2>
+          <p>Whether you manage an office, residential building, mixed-use property, or commercial facility, we’ll build a plan around your operating needs.</p>
+          <div className="contact-details">
+            <a href={`tel:${company.phoneHref}`}>
+              <span><Building2 /></span>
+              <div><small>Call</small><strong>{company.phoneDisplay}</strong></div>
+            </a>
+            <a href={`mailto:${company.email}`}>
+              <span><Sparkles /></span>
+              <div><small>Email</small><strong>{company.email}</strong></div>
+            </a>
+            <div>
+              <span><MapPin /></span>
+              <div><small>Mailing address</small><strong>{company.address}</strong></div>
+            </div>
+          </div>
+        </div>
+        <InquiryForm sourcePath={page.path} heading="Request a free consultation" />
+      </div>
+    </section>
+
+    <section className="section section-cream">
+      <div className="container">
+        <div className="section-heading split">
+          <div>
+            <p className="eyebrow">Our footprint</p>
+            <h2>Serving properties across New York City.</h2>
+          </div>
+          <p>We support commercial and residential buildings throughout the five boroughs. Explore our active service areas below.</p>
+        </div>
+        <ServiceAreaMap />
+      </div>
+    </section>
+  </>;
+}
+
+function ServiceAreaPageWithData({ page }: { page: SitePage }) {
+  return <ClientDataProvider><ServiceAreaPage page={page} /></ClientDataProvider>;
+}
+
 function LegacyRoute({ path, initialArticle, initialNotFoundPath }: { path: string; initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null }) {
   return <LegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
 }
@@ -172,5 +412,5 @@ export function PublicPage({ initialArticle, initialNotFoundPath, initialInsight
   if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
   const page = getPageByPath(location);
   if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
-  return <><ClientHead page={page} />{page.path === "/" ? <HomePageWithData page={page} initialInsights={initialInsights} /> : page.path === "/contact/" || page.path === "/we-serve-new-york/" ? <ContactPage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
+  return <><ClientHead page={page} />{page.path === "/" ? <HomePageWithData page={page} initialInsights={initialInsights} /> : page.path === "/contact/" ? <ContactPage page={page} /> : page.path === "/we-serve-new-york/" ? <ServiceAreaPageWithData page={page} /> : page.path === "/who-we-are/" ? <WhoWeArePage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
 }

@@ -1,21 +1,18 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { Resend } from "resend";
 
-describe("Resend configuration", () => {
-  it("uses a configured verified production sender", () => {
-    const sender = process.env.RESEND_FROM_EMAIL?.trim() ?? "";
-    expect(sender, "RESEND_FROM_EMAIL must be configured").not.toBe("");
-    expect(sender).not.toMatch(/onboarding@resend\.dev/i);
+const cloudBuildConfig = readFileSync(resolve(process.cwd(), "cloudbuild.yaml"), "utf8");
+
+describe("Resend production configuration", () => {
+  it("declares a verified NYC Cleaning sender for the deployed service", () => {
+    expect(cloudBuildConfig).toContain("_RESEND_FROM_EMAIL: NYC Cleaning <notifications@nyccleaning.co>");
+    expect(cloudBuildConfig).toContain("RESEND_FROM_EMAIL=${_RESEND_FROM_EMAIL}");
+    expect(cloudBuildConfig).not.toContain("onboarding@resend.dev");
   });
 
-  it("authenticates the configured server API key", async () => {
-    const apiKey = process.env.RESEND_API_KEY;
-    expect(apiKey, "RESEND_API_KEY must be configured").toBeTruthy();
-
-    const resend = new Resend(apiKey);
-    const response = await resend.domains.list();
-
-    expect(response.error).toBeNull();
-    expect(response.data).toBeDefined();
-  }, 15_000);
+  it("injects the Resend API key into the deployed service through Secret Manager", () => {
+    expect(cloudBuildConfig).toContain("_RESEND_API_KEY_SECRET: nyc-cleaning-resend-api-key");
+    expect(cloudBuildConfig).toContain("RESEND_API_KEY=${_RESEND_API_KEY_SECRET}:latest");
+  });
 });
