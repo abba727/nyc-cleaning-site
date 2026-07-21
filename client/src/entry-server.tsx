@@ -62,19 +62,24 @@ export async function render(url: string) {
   const matchedPage = getPageByPath(pathname);
   const matchedLegacy = getLegacyByPath(pathname);
   const isSyntheticArchive = isBlogArchivePath(pathname);
-  const cmsArticle = !matchedPage && !matchedLegacy && !isSyntheticArchive
+  const isAdminPath = pathname === "/admin/" || pathname.startsWith("/admin/");
+  const cmsArticle = !isAdminPath && !matchedPage && !matchedLegacy && !isSyntheticArchive
     ? await getCmsArticleForRender(pathname)
     : undefined;
   const initialInsights = pathname === "/" ? await getLatestCmsArticlesForRender() : [];
   const page = matchedPage || pages[0];
-  const isNotFound = !matchedPage && !matchedLegacy && !isSyntheticArchive && !cmsArticle;
-  const seo = cmsArticle
-    ? { path: cmsArticle.path, title: cmsArticle.seoTitle || cmsArticle.title, description: cmsArticle.metaDescription || cmsArticle.excerpt || cmsArticle.description, h1: cmsArticle.title, kind: "blog" }
-    : matchedLegacy
-      ? getLegacySeo(matchedLegacy)
-      : isSyntheticArchive
-        ? getArchiveSeo(pathname)
-        : getPageSeo(page);
+  const isNotFound = !isAdminPath && !matchedPage && !matchedLegacy && !isSyntheticArchive && !cmsArticle;
+  const seo = isAdminPath
+    ? { path: pathname, title: "Owner Workspace | NYC Cleaning", description: "Private NYC Cleaning content management workspace.", h1: "Owner Workspace", kind: "admin", indexable: false }
+    : isNotFound
+      ? { path: pathname, title: "Page Not Found | NYC Cleaning", description: "The requested NYC Cleaning page could not be found.", h1: "Page Not Found", kind: "not_found", indexable: false }
+      : cmsArticle
+      ? { path: cmsArticle.path, title: cmsArticle.seoTitle || cmsArticle.title, description: cmsArticle.metaDescription || cmsArticle.excerpt || cmsArticle.description, h1: cmsArticle.title, kind: "blog", indexable: true }
+      : matchedLegacy
+        ? getLegacySeo(matchedLegacy)
+        : isSyntheticArchive
+          ? getArchiveSeo(pathname)
+          : getPageSeo(page);
   const legacyPayload: LegacyContentPayload | null = matchedLegacy || isSyntheticArchive
     ? { content: legacyContent, images: legacyArticleImages }
     : null;
@@ -96,12 +101,27 @@ export async function render(url: string) {
   const crumbs = [{ name: "Home", item: `${siteOrigin}/` }];
   if (seo.path !== "/") crumbs.push({ name: seo.h1.replace(/\s*\|.*$/, ""), item: canonical });
   const isArticle = Boolean(cmsArticle || matchedLegacy?.kind === "article");
-  const pageSchema = { "@type": isArticle ? "Article" : "WebPage", "@id": `${canonical}#webpage`, url: canonical, name: seo.title, headline: isArticle ? seo.h1 : undefined, datePublished: cmsArticle?.publishedAt?.toISOString() || matchedLegacy?.publishedAt || undefined, dateModified: cmsArticle?.updatedAt?.toISOString() || undefined, image: imageUrl, description: seo.description, isPartOf: { "@id": `${siteOrigin}/#website` } };
+  const articlePublishedAt = cmsArticle?.publishedAt?.toISOString() || matchedLegacy?.publishedAt;
+  const articleModifiedAt = cmsArticle?.updatedAt?.toISOString() || articlePublishedAt;
+  const pageSchema = {
+    "@type": isArticle ? "Article" : "WebPage",
+    "@id": `${canonical}#webpage`,
+    url: canonical,
+    name: seo.title,
+    headline: isArticle ? seo.h1 : undefined,
+    datePublished: isArticle ? articlePublishedAt : undefined,
+    dateModified: isArticle ? articleModifiedAt : undefined,
+    image: isArticle ? { "@type": "ImageObject", url: imageUrl } : imageUrl,
+    author: isArticle ? { "@id": `${siteOrigin}/#localbusiness` } : undefined,
+    publisher: isArticle ? { "@id": `${siteOrigin}/#localbusiness` } : undefined,
+    description: seo.description,
+    isPartOf: { "@id": `${siteOrigin}/#website` },
+  };
   const schema = {
     "@context": "https://schema.org",
     "@graph": [
       {
-        "@type": "LocalBusiness",
+        "@type": ["LocalBusiness", "Organization"],
         "@id": `${siteOrigin}/#localbusiness`,
         name: company.name,
         url: siteOrigin,
@@ -137,7 +157,7 @@ export async function render(url: string) {
   const head = [
     `<title>${escapeHtml(seo.title)}</title>`,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`,
-    `<meta name="robots" content="${isNotFound ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}" />`,
+    `<meta name="robots" content="${isNotFound || seo.indexable === false ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}" />`,
     `<link rel="canonical" href="${canonical}" />`,
     homeHeroPreload,
     legacyHydration,

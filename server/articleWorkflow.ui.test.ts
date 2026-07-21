@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(resolve(process.cwd(), "client/src/pages/ArticleAdmin.tsx"), "utf8");
-const styles = readFileSync(resolve(process.cwd(), "client/src/index.css"), "utf8");
+const styles = readFileSync(resolve(process.cwd(), "client/src/admin.css"), "utf8");
 
 describe("Insight editor workflow", () => {
   it("offers date-based scheduling with explicit Draft, Scheduled, and Published states", () => {

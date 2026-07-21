@@ -1,7 +1,6 @@
 import { createRoot, hydrateRoot } from "react-dom/client";
 import App from "./App";
 import type { InitialPublishedArticle } from "./components/PublicPage";
-import "./index.css";
 
 declare global {
   interface Window {

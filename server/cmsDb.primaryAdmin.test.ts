@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbMocks = vi.hoisted(() => ({ getDb: vi.fn() }));
 vi.mock("./db", () => dbMocks);
+vi.mock("./_core/env", () => ({
+  ENV: {
+    primaryAdminEmail: "albert.aranbaev@gmail.com",
+    cookieSecret: "ci-only-secret-with-sufficient-length-1234567890",
+  },
+}));
 
 import { createPrimaryAdminSetup } from "./cmsDb";
 
