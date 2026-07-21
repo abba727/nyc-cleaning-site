@@ -13,6 +13,21 @@ function sameStringArray(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+function tableSetDistance(actual, snapshot) {
+  const expected = new Set(Object.keys(snapshot.tables));
+  const found = new Set(actual.tables.keys());
+  let distance = 0;
+
+  for (const tableName of expected) {
+    if (!found.has(tableName)) distance += 1;
+  }
+  for (const tableName of found) {
+    if (!expected.has(tableName)) distance += 1;
+  }
+
+  return distance;
+}
+
 function normalizeType(value) {
   const type = String(value || "").toLowerCase().replaceAll(" ", "");
   if (type === "boolean") return "tinyint(1)";
@@ -312,12 +327,15 @@ export async function reconcileVerifiedMigrationHistory(pool, migrationsFolder) 
     const candidates = migrations.map((migration, index) => ({
       index,
       migration,
+      tableDistance: tableSetDistance(actual, migration.snapshot),
       mismatches: compareSchemaToSnapshot(actual, migration.snapshot),
     }));
     const match = candidates.filter((candidate) => candidate.mismatches.length === 0).at(-1);
 
     if (!match) {
       const closest = [...candidates].sort((left, right) => {
+        const tableDistance = left.tableDistance - right.tableDistance;
+        if (tableDistance) return tableDistance;
         const mismatchCount = left.mismatches.length - right.mismatches.length;
         return mismatchCount || right.index - left.index;
       })[0];
@@ -340,6 +358,7 @@ export async function reconcileVerifiedMigrationHistory(pool, migrationsFolder) 
 export const __testOnly = {
   actualIndexSignatures,
   expectedIndexSignatures,
+  tableSetDistance,
   normalizeDefault,
   normalizeType,
 };
