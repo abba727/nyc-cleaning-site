@@ -1,4 +1,4 @@
-import { boolean, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, double, int, json, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export type ArticleBlock = {
   type: "h2" | "h3" | "p" | "li";
@@ -179,3 +179,47 @@ export const articles = mysqlTable("articles", {
 
 export type Article = typeof articles.$inferSelect;
 export type InsertArticle = typeof articles.$inferInsert;
+
+/**
+ * Audit records for address-file imports submitted through the CMS Projects workspace.
+ * Source spreadsheets are parsed in the browser; only normalized address rows are stored.
+ */
+export const projectImports = mysqlTable("projectImports", {
+  id: int("id").autoincrement().primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  sourceType: mysqlEnum("sourceType", ["csv", "xlsx", "xls"]).notNull(),
+  rowCount: int("rowCount").default(0).notNull(),
+  importedCount: int("importedCount").default(0).notNull(),
+  skippedCount: int("skippedCount").default(0).notNull(),
+  status: mysqlEnum("status", ["completed", "partial", "failed"]).default("completed").notNull(),
+  errorSummary: text("errorSummary"),
+  uploadedByUserId: int("uploadedByUserId").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProjectImport = typeof projectImports.$inferSelect;
+export type InsertProjectImport = typeof projectImports.$inferInsert;
+
+/**
+ * Addresses of active or historical properties serviced by NYC Cleaning.
+ * Coordinates are optional because the public map can geocode imported addresses
+ * when a row does not yet contain a stored location.
+ */
+export const projectLocations = mysqlTable("projectLocations", {
+  id: int("id").autoincrement().primaryKey(),
+  address: varchar("address", { length: 512 }).notNull(),
+  city: varchar("city", { length: 160 }).notNull(),
+  state: varchar("state", { length: 64 }).notNull(),
+  zip: varchar("zip", { length: 24 }).notNull(),
+  label: varchar("label", { length: 255 }),
+  latitude: double("latitude"),
+  longitude: double("longitude"),
+  isActive: boolean("isActive").default(true).notNull(),
+  importBatchId: int("importBatchId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProjectLocation = typeof projectLocations.$inferSelect;
+export type InsertProjectLocation = typeof projectLocations.$inferInsert;

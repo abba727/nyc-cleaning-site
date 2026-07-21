@@ -3,7 +3,32 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { CMS_PASSWORD_MIN_LENGTH, CMS_PASSWORD_REQUIREMENT } from "@shared/cmsPassword";
 import { ARTICLE_BODY_MAX_GENERATION_LENGTH, ARTICLE_BODY_MIN_GENERATION_LENGTH, ARTICLE_TOPIC_MAX_LENGTH, ARTICLE_TOPIC_MIN_LENGTH } from "@shared/articleSeo";
-import { countRecentInquiriesByEmail, createArticle, createInquiry, createInquiryResponse, deleteArticle, findArticleUrlConflict, getInquiryById, getPublishedArticleByPath, listAllArticles, listInquiries, listPublishedArticles, markInquiryResponded, updateArticle, updateInquiryNotificationStatus, updateInquiryResponseDelivery, updateInquiryStatus } from "./db";
+import {
+  countRecentInquiriesByEmail,
+  createArticle,
+  createInquiry,
+  createInquiryResponse,
+  createProjectImport,
+  createProjectLocations,
+  deleteArticle,
+  deleteProjectLocation,
+  findArticleUrlConflict,
+  getInquiryById,
+  getPublishedArticleByPath,
+  listActiveProjectLocations,
+  listAllArticles,
+  listInquiries,
+  listProjectImports,
+  listProjectLocations,
+  listPublishedArticles,
+  markInquiryResponded,
+  updateArticle,
+  updateInquiryNotificationStatus,
+  updateInquiryResponseDelivery,
+  updateInquiryStatus,
+  updateProjectImport,
+  updateProjectLocation,
+} from "./db";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
@@ -155,6 +180,28 @@ const articleInput = z.object({
   status: z.enum(["draft", "published"]),
   publishedAt: z.coerce.date().nullable().optional(),
 });
+
+const projectLocationInput = z.object({
+  address: z.string().trim().min(2).max(512),
+  city: z.string().trim().min(2).max(160),
+  state: z.string().trim().min(2).max(64),
+  zip: z.string().trim().min(3).max(24),
+  label: z.string().trim().max(255).optional(),
+  latitude: z.number().finite().min(-90).max(90).nullable().optional(),
+  longitude: z.number().finite().min(-180).max(180).nullable().optional(),
+});
+
+const projectLocationUpdateInput = projectLocationInput.extend({
+  id: z.number().int().positive(),
+  isActive: z.boolean(),
+});
+
+function normalizeProjectLocation(input: z.infer<typeof projectLocationInput>) {
+  return {
+    ...input,
+    label: input.label?.trim() || null,
+  };
+}
 
 async function ensureArticleUrlAvailable(input: { path: string; slug: string }, excludeId?: number) {
   const conflict = await findArticleUrlConflict({ path: input.path, slug: input.slug, excludeId });
@@ -433,6 +480,90 @@ export const appRouter = router({
         await updateInquiryResponseDelivery({ id: responseId, deliveryStatus: "failed", errorMessage });
         console.error(`[Inquiry] CMS reply failed for inquiry ${input.id}`, error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The reply could not be sent. Your message was saved; please try again." });
+      }
+    }),
+  }),
+  projects: router({
+    listLocations: publicProcedure.query(() => listActiveProjectLocations()),
+    adminList: adminProcedure.query(() => listProjectLocations()),
+    listImports: adminProcedure.query(() => listProjectImports()),
+    create: adminProcedure.input(projectLocationInput).mutation(async ({ input }) => {
+      await createProjectLocations([{
+        ...normalizeProjectLocation(input),
+        isActive: true,
+        importBatchId: null,
+      }]);
+      return { success: true } as const;
+    }),
+    update: adminProcedure.input(projectLocationUpdateInput).mutation(async ({ input }) => {
+      const { id, isActive, ...location } = input;
+      await updateProjectLocation(id, {
+        ...normalizeProjectLocation(location),
+        isActive,
+      });
+      return { success: true } as const;
+    }),
+    remove: adminProcedure.input(z.object({ id: z.number().int().positive() })).mutation(async ({ input }) => {
+      await deleteProjectLocation(input.id);
+      return { success: true } as const;
+    }),
+    importRows: adminProcedure.input(z.object({
+      filename: z.string().trim().min(1).max(255),
+      sourceType: z.enum(["csv", "xlsx", "xls"]),
+      sourceRowCount: z.number().int().positive().max(5000),
+      rows: z.array(projectLocationInput).min(1).max(5000),
+    })).mutation(async ({ input, ctx }) => {
+      if (input.rows.length > input.sourceRowCount) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "The parsed address count cannot exceed the source row count." });
+      }
+
+      const seen = new Set<string>();
+      const rows = input.rows
+        .map(normalizeProjectLocation)
+        .filter(row => {
+          const key = [row.address, row.city, row.state, row.zip]
+            .map(value => value.trim().toLocaleLowerCase())
+            .join("|");
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      const skippedCount = input.sourceRowCount - rows.length;
+      const status = skippedCount > 0 ? "partial" : "completed" as const;
+      const errorSummary = skippedCount > 0
+        ? `${skippedCount} row${skippedCount === 1 ? " was" : "s were"} skipped because it was incomplete or duplicated.`
+        : null;
+      const importId = await createProjectImport({
+        filename: input.filename,
+        sourceType: input.sourceType,
+        rowCount: input.sourceRowCount,
+        importedCount: 0,
+        skippedCount,
+        status,
+        errorSummary,
+        uploadedByUserId: ctx.user.id,
+      });
+
+      try {
+        await createProjectLocations(rows.map(row => ({
+          ...row,
+          isActive: true,
+          importBatchId: importId,
+        })));
+        await updateProjectImport(importId, {
+          importedCount: rows.length,
+          skippedCount,
+          status,
+          errorSummary,
+        });
+        return { success: true, importId, importedCount: rows.length, skippedCount } as const;
+      } catch (error) {
+        const detail = error instanceof Error ? error.message.slice(0, 1000) : "Address rows could not be saved.";
+        await updateProjectImport(importId, {
+          status: "failed",
+          errorSummary: detail,
+        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The address import could not be saved. Please try again." });
       }
     }),
   }),

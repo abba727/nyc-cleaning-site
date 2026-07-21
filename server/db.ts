@@ -1,7 +1,20 @@
 import { and, asc, count, desc, eq, gt, isNull, lte, ne, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createPool } from "mysql2";
-import { articles, inquiries, inquiryResponses, InsertArticle, InsertInquiry, InsertInquiryResponse, InsertUser, users } from "../drizzle/schema";
+import {
+  articles,
+  inquiries,
+  inquiryResponses,
+  InsertArticle,
+  InsertInquiry,
+  InsertInquiryResponse,
+  InsertProjectImport,
+  InsertProjectLocation,
+  InsertUser,
+  projectImports,
+  projectLocations,
+  users,
+} from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -275,4 +288,89 @@ export async function deleteArticle(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   await db.delete(articles).where(eq(articles.id, id));
+}
+
+export async function listActiveProjectLocations() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  return db
+    .select({
+      id: projectLocations.id,
+      address: projectLocations.address,
+      city: projectLocations.city,
+      state: projectLocations.state,
+      zip: projectLocations.zip,
+      label: projectLocations.label,
+      latitude: projectLocations.latitude,
+      longitude: projectLocations.longitude,
+    })
+    .from(projectLocations)
+    .where(eq(projectLocations.isActive, true))
+    .orderBy(asc(projectLocations.city), asc(projectLocations.address), asc(projectLocations.id));
+}
+
+export async function listProjectLocations() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  return db
+    .select()
+    .from(projectLocations)
+    .orderBy(desc(projectLocations.updatedAt), desc(projectLocations.id));
+}
+
+export async function listProjectImports() {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  return db
+    .select()
+    .from(projectImports)
+    .orderBy(desc(projectImports.createdAt), desc(projectImports.id));
+}
+
+export async function createProjectImport(input: InsertProjectImport) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  const result = await db.insert(projectImports).values(input).$returningId();
+  const id = result[0]?.id;
+  if (!id) throw new Error("Project import could not be created");
+  return id;
+}
+
+export async function createProjectLocations(input: InsertProjectLocation[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  if (input.length === 0) return;
+
+  await db.insert(projectLocations).values(input);
+}
+
+export async function updateProjectImport(
+  id: number,
+  input: Partial<Pick<InsertProjectImport, "importedCount" | "skippedCount" | "status" | "errorSummary">>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.update(projectImports).set(input).where(eq(projectImports.id, id));
+}
+
+export async function updateProjectLocation(
+  id: number,
+  input: Partial<Pick<InsertProjectLocation, "address" | "city" | "state" | "zip" | "label" | "latitude" | "longitude" | "isActive">>,
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.update(projectLocations).set(input).where(eq(projectLocations.id, id));
+}
+
+export async function deleteProjectLocation(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.delete(projectLocations).where(eq(projectLocations.id, id));
 }
