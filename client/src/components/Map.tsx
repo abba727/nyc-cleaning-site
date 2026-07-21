@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
-import "leaflet/dist/leaflet.css";
 import { cn } from "@/lib/utils";
 
 export type MapMarker = {
