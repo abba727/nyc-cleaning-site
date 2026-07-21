@@ -244,11 +244,6 @@ function WhoWeArePage({ page }: { page: SitePage }) {
 
 type ServiceMapLocation = {
   id: number;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  label: string | null;
   latitude: number | null;
   longitude: number | null;
 };
@@ -263,7 +258,6 @@ function ServiceAreaMap() {
           id: location.id,
           latitude: location.latitude,
           longitude: location.longitude,
-          title: location.label || `${location.address}, ${location.city}, ${location.state} ${location.zip}`,
         }]
       : []
   ));
@@ -276,7 +270,7 @@ function ServiceAreaMap() {
     mapMessage = "Service locations will appear here as they are added to the NYC Cleaning CMS.";
   } else if (!locations.isLoading && markers.length > 0) {
     mapMessage = unresolvedCount > 0
-      ? `Showing ${markers.length} active service location${markers.length === 1 ? "" : "s"}. ${unresolvedCount} address${unresolvedCount === 1 ? " is" : "es are"} still being prepared.`
+      ? `Showing ${markers.length} active service location${markers.length === 1 ? "" : "s"}. ${unresolvedCount} location${unresolvedCount === 1 ? " is" : "s are"} still being prepared.`
       : `Showing ${markers.length} active service location${markers.length === 1 ? "" : "s"} across New York City.`;
   } else if (!locations.isLoading) {
     mapMessage = "Service locations are being prepared for the map.";

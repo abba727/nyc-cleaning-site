@@ -6,7 +6,6 @@ export type MapMarker = {
   id: number;
   latitude: number;
   longitude: number;
-  title: string;
 };
 
 interface MapViewProps {
@@ -20,11 +19,11 @@ interface MapViewProps {
 
 const NYC_CENTER: Leaflet.LatLngExpression = [40.7128, -74.006];
 const SERVICE_MARKER_STYLE: Leaflet.CircleMarkerOptions = {
-  radius: 5,
-  color: "#08243d",
+  radius: 5.5,
+  color: "#06285c",
   weight: 1.5,
-  fillColor: "#56c9c3",
-  fillOpacity: 0.95,
+  fillColor: "#0a3d91",
+  fillOpacity: 0.96,
 };
 
 /**
@@ -112,8 +111,8 @@ export function MapView({
       if (mapRef.current !== map || markerLayerRef.current !== markerLayer) return;
 
       for (const marker of validMarkers) {
+        // Public markers intentionally carry no property identity or address data.
         L.circleMarker([marker.latitude, marker.longitude], SERVICE_MARKER_STYLE)
-          .bindTooltip(marker.title, { direction: "top", opacity: 0.95 })
           .addTo(markerLayer);
       }
 
