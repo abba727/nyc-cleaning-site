@@ -69,9 +69,9 @@ interface MapViewProps {
 const NYC_CENTER: MapCenter = [40.7128, -74.006];
 const GOOGLE_SCRIPT_ID = "nyc-cleaning-google-maps-sdk";
 const SERVICE_MARKER_STYLE: Leaflet.CircleMarkerOptions = {
-  radius: 5.5,
+  radius: 6.5,
   color: "#06285c",
-  weight: 1.5,
+  weight: 1.75,
   fillColor: "#0a3d91",
   fillOpacity: 0.96,
 };
@@ -203,11 +203,11 @@ function GoogleMapView({
     circlesRef.current = validMarkers.map(marker => new maps.Circle({
       map,
       center: { lat: marker.latitude, lng: marker.longitude },
-      radius: 65,
+      radius: 95,
       clickable: false,
       strokeColor: "#06285c",
       strokeOpacity: 1,
-      strokeWeight: 2,
+      strokeWeight: 2.25,
       fillColor: "#0a3d91",
       fillOpacity: 0.9,
     }));
@@ -218,7 +218,7 @@ function GoogleMapView({
     } else if (validMarkers.length > 1) {
       const bounds = new maps.LatLngBounds();
       validMarkers.forEach(marker => bounds.extend({ lat: marker.latitude, lng: marker.longitude }));
-      map.fitBounds(bounds, 48);
+      map.fitBounds(bounds, 24);
     }
   }, [markers, mapVersion]);
 
@@ -307,7 +307,7 @@ function LeafletMapView({
         map.setView([validMarkers[0].latitude, validMarkers[0].longitude], 14);
       } else if (validMarkers.length > 1) {
         const bounds = L.latLngBounds(validMarkers.map(marker => [marker.latitude, marker.longitude] as Leaflet.LatLngTuple));
-        map.fitBounds(bounds.pad(0.1), { padding: [48, 48], maxZoom: 13 });
+        map.fitBounds(bounds.pad(0.06), { padding: [24, 24], maxZoom: 13 });
       }
 
       window.setTimeout(() => map.invalidateSize(), 0);
