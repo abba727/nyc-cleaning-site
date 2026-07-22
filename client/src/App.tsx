@@ -5,7 +5,9 @@ import { SiteFooter } from "./components/SiteFooter";
 import { SiteHeader } from "./components/SiteHeader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LegacyContentProvider, type LegacyContentPayload } from "./contexts/LegacyContentContext";
+import { QuoteFormOverlayProvider } from "./components/QuoteFormOverlay";
 import Home from "./pages/Home";
+import ThankYou from "./pages/ThankYou";
 import type { InitialPublishedArticle } from "./components/PublicPage";
 
 const AdminApp = lazy(() => import("./components/AdminApp"));
@@ -19,11 +21,12 @@ function Router({ initialArticle, initialNotFoundPath, initialInsights }: { init
   if (location.startsWith("/admin")) {
     return <Suspense fallback={<AdminLoadingState />}><AdminApp /></Suspense>;
   }
-  return <div className="site-shell">
+  const isThankYou = location.replace(/\/+$/, "") === "/thank-you";
+  return <QuoteFormOverlayProvider><div className="site-shell">
     <SiteHeader />
-    <main><Home initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} initialInsights={initialInsights} /></main>
+    <main>{isThankYou ? <ThankYou /> : <Home initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} initialInsights={initialInsights} />}</main>
     <SiteFooter />
-  </div>;
+  </div></QuoteFormOverlayProvider>;
 }
 
 function App({

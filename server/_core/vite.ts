@@ -48,8 +48,11 @@ export async function setupVite(app: Express, server: Server) {
       template = template.replace(`src="/src/entry-client.tsx"`, `src="/src/entry-client.tsx?v=${nanoid()}"`);
       template = await vite.transformIndexHtml(url, template);
       const entry = await vite.ssrLoadModule("/src/entry-server.tsx");
-      const rendered = await entry.render(url) as { html: string; head: string; status: number };
-      const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
+      const rendered = await entry.render(url) as { html: string; head: string; body: string; status: number };
+      const page = template
+        .replace("<!--app-head-->", rendered.head)
+        .replace("<!--app-html-->", rendered.html)
+        .replace("<!--analytics-script-->", rendered.body);
       res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -75,7 +78,10 @@ export function serveStatic(app: Express) {
     try {
       const template = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
       const rendered = await renderProduction(req.originalUrl);
-      const page = template.replace("<!--app-head-->", rendered.head).replace("<!--app-html-->", rendered.html);
+      const page = template
+        .replace("<!--app-head-->", rendered.head)
+        .replace("<!--app-html-->", rendered.html)
+        .replace("<!--analytics-script-->", rendered.body);
       res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
     } catch (error) {
       next(error);

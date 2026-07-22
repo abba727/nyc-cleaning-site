@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/useMobile";
 import { getDashboardAccessState } from "@/lib/adminAccess";
-import { ArrowUpRight, FileText, Inbox, LogOut, MapPin, PanelLeft, Users } from "lucide-react";
+import { ArrowUpRight, FileText, Inbox, LogOut, MapPin, PanelLeft, Settings, Users } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import "../admin.css";
@@ -33,6 +33,7 @@ const menuItems = [
   { icon: Inbox, label: "Inquiries", path: "/admin/inquiries", adminOnly: false },
   { icon: MapPin, label: "Projects", path: "/admin/projects", adminOnly: false },
   { icon: Users, label: "Users", path: "/admin/users", adminOnly: true },
+  { icon: Settings, label: "Tracking settings", path: "/admin/settings", adminOnly: true },
   { icon: ArrowUpRight, label: "View public site", path: "/", adminOnly: false },
 ];
 

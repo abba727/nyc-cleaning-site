@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, Phone, X } from "lucide-react";
 import { brandAssets } from "@/content/assets";
 import { company, serviceGroups, serviceName } from "@/content/site";
+import { QuoteCta } from "./QuoteFormOverlay";
 
 const mainLinks = [
   { href: "/", label: "Home" },
@@ -48,7 +49,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="nav-actions">
-          <Link href="/contact/" className="button button-gold">Request a Quote</Link>
+          <QuoteCta className="button button-gold">Request a Quote</QuoteCta>
           <button className="menu-toggle" type="button" onClick={() => setOpen(value => !value)} aria-expanded={open} aria-controls="mobile-menu" aria-label={open ? "Close navigation" : "Open navigation"}>
             {open ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
           </button>
@@ -60,7 +61,7 @@ export function SiteHeader() {
           <div className="container mobile-nav-inner">
             {mainLinks.map(link => <Link key={link.href} href={link.href} onClick={() => setOpen(false)}>{link.label}</Link>)}
             <div className="mobile-services">{serviceGroups.map(group => <div className="mobile-service-group" key={group.label}><p>{group.label}</p>{group.services.map(service => <Link key={service.path} href={service.path} onClick={() => setOpen(false)}>{serviceName(service)}</Link>)}</div>)}</div>
-            <Link href="/contact/" className="button button-gold" onClick={() => setOpen(false)}>Request a Quote</Link>
+            <QuoteCta className="button button-gold" onClick={() => setOpen(false)}>Request a Quote</QuoteCta>
           </div>
         </nav>
       )}

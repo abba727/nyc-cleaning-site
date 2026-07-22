@@ -218,7 +218,7 @@ function GoogleMapView({
     } else if (validMarkers.length > 1) {
       const bounds = new maps.LatLngBounds();
       validMarkers.forEach(marker => bounds.extend({ lat: marker.latitude, lng: marker.longitude }));
-      map.fitBounds(bounds, 24);
+      map.fitBounds(bounds, 12);
     }
   }, [markers, mapVersion]);
 
@@ -307,7 +307,7 @@ function LeafletMapView({
         map.setView([validMarkers[0].latitude, validMarkers[0].longitude], 14);
       } else if (validMarkers.length > 1) {
         const bounds = L.latLngBounds(validMarkers.map(marker => [marker.latitude, marker.longitude] as Leaflet.LatLngTuple));
-        map.fitBounds(bounds.pad(0.06), { padding: [24, 24], maxZoom: 13 });
+        map.fitBounds(bounds.pad(0.03), { padding: [12, 12], maxZoom: 14 });
       }
 
       window.setTimeout(() => map.invalidateSize(), 0);

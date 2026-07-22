@@ -223,3 +223,18 @@ export const projectLocations = mysqlTable("projectLocations", {
 
 export type ProjectLocation = typeof projectLocations.$inferSelect;
 export type InsertProjectLocation = typeof projectLocations.$inferInsert;
+
+/**
+ * Single-record public-site configuration managed by CMS administrators.
+ * These identifiers are intentionally public values that Google expects in page markup.
+ */
+export const siteSettings = mysqlTable("siteSettings", {
+  id: int("id").primaryKey(),
+  googleAnalyticsMeasurementId: varchar("googleAnalyticsMeasurementId", { length: 32 }),
+  googleTagManagerContainerId: varchar("googleTagManagerContainerId", { length: 32 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SiteSettings = typeof siteSettings.$inferSelect;
+export type InsertSiteSettings = typeof siteSettings.$inferInsert;

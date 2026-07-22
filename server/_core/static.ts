@@ -51,7 +51,8 @@ export function serveStatic(app: Express) {
       const rendered = await renderProduction(req.originalUrl);
       const page = template
         .replace("<!--app-head-->", rendered.head)
-        .replace("<!--app-html-->", rendered.html);
+        .replace("<!--app-html-->", rendered.html)
+        .replace("<!--analytics-script-->", rendered.body);
       res
         .status(rendered.status)
         .set({

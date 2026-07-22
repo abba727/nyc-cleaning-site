@@ -13,6 +13,7 @@ import {
   InsertUser,
   projectImports,
   projectLocations,
+  siteSettings,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -421,4 +422,39 @@ export async function deleteProjectLocations(ids: number[]) {
   if (ids.length === 0) return;
 
   await db.delete(projectLocations).where(inArray(projectLocations.id, ids));
+}
+
+export const defaultSiteSettings = {
+  googleAnalyticsMeasurementId: null as string | null,
+  googleTagManagerContainerId: null as string | null,
+};
+
+export async function getSiteSettings() {
+  const db = await getDb();
+  if (!db) return defaultSiteSettings;
+
+  const rows = await db
+    .select({
+      googleAnalyticsMeasurementId: siteSettings.googleAnalyticsMeasurementId,
+      googleTagManagerContainerId: siteSettings.googleTagManagerContainerId,
+    })
+    .from(siteSettings)
+    .where(eq(siteSettings.id, 1))
+    .limit(1);
+
+  return rows[0] ?? defaultSiteSettings;
+}
+
+export async function updateSiteSettings(input: {
+  googleAnalyticsMeasurementId: string | null;
+  googleTagManagerContainerId: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+
+  await db.insert(siteSettings).values({ id: 1, ...input }).onDuplicateKeyUpdate({
+    set: input,
+  });
+
+  return getSiteSettings();
 }

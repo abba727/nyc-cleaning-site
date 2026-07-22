@@ -2,7 +2,7 @@ import { FormEvent, useState } from "react";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { company, services, serviceName } from "@/content/site";
 
-type InquiryFormProps = { compact?: boolean; sourcePath: string; heading?: string };
+type InquiryFormProps = { compact?: boolean; sourcePath: string; heading?: string; onSuccess?: () => void };
 type FieldName = "name" | "email" | "phone" | "serviceType" | "message";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
@@ -23,7 +23,7 @@ export function validateInquiryValues(values: Record<FieldName, string>): FieldE
   return errors;
 }
 
-export function InquiryForm({ compact = false, sourcePath, heading = "Request a tailored quote" }: InquiryFormProps) {
+export function InquiryForm({ compact = false, sourcePath, heading = "Request a tailored quote", onSuccess }: InquiryFormProps) {
   const [success, setSuccess] = useState(false);
   const [phone, setPhone] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -58,6 +58,10 @@ export function InquiryForm({ compact = false, sourcePath, heading = "Request a 
         setFormError(payload?.error === "TOO_MANY_REQUESTS"
           ? "You’ve sent several requests recently. Please wait a few minutes and try again."
           : payload?.message || `We couldn’t send your request right now. Please review the highlighted fields or call ${company.phoneDisplay} for immediate help.`);
+        return;
+      }
+      if (onSuccess) {
+        onSuccess();
         return;
       }
       setSuccess(true);

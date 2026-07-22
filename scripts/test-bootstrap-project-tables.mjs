@@ -9,7 +9,7 @@ assert.equal(sameArray(["id"], ["id", "address"]), false);
 
 assert.deepEqual(
   TABLE_DEFINITIONS.map((table) => table.name),
-  ["projectImports", "projectLocations"],
+  ["projectImports", "projectLocations", "siteSettings"],
 );
 
 for (const table of TABLE_DEFINITIONS) {
@@ -18,4 +18,4 @@ for (const table of TABLE_DEFINITIONS) {
   assert.equal(table.columns[0], "id");
 }
 
-console.log("project table bootstrap tests passed");
+console.log("project and site-settings bootstrap tests passed");

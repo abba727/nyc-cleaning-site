@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const dbMocks = vi.hoisted(() => ({ getPublishedArticleByPath: vi.fn(), listPublishedArticles: vi.fn() }));
+const dbMocks = vi.hoisted(() => ({ getPublishedArticleByPath: vi.fn(), getSiteSettings: vi.fn(), listPublishedArticles: vi.fn() }));
 vi.mock("./db", () => dbMocks);
 
 import { render } from "../client/src/entry-server";
@@ -9,6 +9,7 @@ describe("CMS Insight SSR hydration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.listPublishedArticles.mockResolvedValue([]);
+    dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: null, googleTagManagerContainerId: null });
   });
 
   it("server-renders the published article body and serializes matching initial client state", async () => {
@@ -125,5 +126,34 @@ describe("CMS Insight SSR hydration", () => {
     const stateScript = result.head.match(/<script>window\.__INITIAL_ARTICLE__=(.*?)<\/script>/)?.[1] || "";
     expect(stateScript).toContain("\\u003c/script>");
     expect(stateScript).not.toContain("</script>");
+  });
+});
+
+describe("CMS tracking SSR", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMocks.getPublishedArticleByPath.mockResolvedValue(null);
+    dbMocks.listPublishedArticles.mockResolvedValue([]);
+  });
+
+  it("renders a direct GA4 tag when only a valid Measurement ID is configured", async () => {
+    dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: null });
+
+    const result = await render("/");
+
+    expect(result.head).toContain("https://www.googletagmanager.com/gtag/js?id=G-TEST12345");
+    expect(result.head).toContain("gtag('config','G-TEST12345')");
+    expect(result.body).toBe("");
+  });
+
+  it("prefers the GTM container and avoids emitting a duplicate direct GA4 tag", async () => {
+    dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: "GTM-TEST123" });
+
+    const result = await render("/");
+
+    expect(result.head).toContain("googletagmanager.com/gtm.js?id='+i+dl");
+    expect(result.head).toContain("GTM-TEST123");
+    expect(result.head).not.toContain("gtag/js?id=G-TEST12345");
+    expect(result.body).toContain("https://www.googletagmanager.com/ns.html?id=GTM-TEST123");
   });
 });

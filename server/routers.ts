@@ -16,6 +16,7 @@ import {
   findArticleUrlConflict,
   getInquiryById,
   getPublishedArticleByPath,
+  getSiteSettings,
   listActiveProjectLocations,
   listActiveProjectLocationsMissingCoordinates,
   listAllArticles,
@@ -31,6 +32,7 @@ import {
   updateProjectImport,
   updateProjectLocation,
   updateProjectLocationCoordinates,
+  updateSiteSettings,
 } from "./db";
 import { geocodeProjectLocations } from "./projectGeocoding";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -205,6 +207,11 @@ const projectLocationInput = projectLocationImportRowInput.extend({
 const projectLocationUpdateInput = projectLocationInput.extend({
   id: z.number().int().positive(),
   isActive: z.boolean(),
+});
+
+const siteSettingsInput = z.object({
+  googleAnalyticsMeasurementId: z.string().trim().toUpperCase().regex(/^G-[A-Z0-9-]+$/, "Enter a GA4 Measurement ID beginning with G-").nullable(),
+  googleTagManagerContainerId: z.string().trim().toUpperCase().regex(/^GTM-[A-Z0-9-]+$/, "Enter a Google Tag Manager container ID beginning with GTM-").nullable(),
 });
 
 function isCompleteProjectLocation(
@@ -507,6 +514,13 @@ export const appRouter = router({
       } catch (error) {
         accountError(error);
       }
+    }),
+  }),
+  siteSettings: router({
+    get: accountAdminProcedure.query(() => getSiteSettings()),
+    update: accountAdminProcedure.input(siteSettingsInput).mutation(async ({ input }) => {
+      const settings = await updateSiteSettings(input);
+      return { success: true, settings } as const;
     }),
   }),
   inquiry: router({

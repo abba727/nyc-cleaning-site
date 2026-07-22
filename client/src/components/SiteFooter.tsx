@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { brandAssets } from "@/content/assets";
 import { company, services, serviceName } from "@/content/site";
+import { QuoteCta } from "./QuoteFormOverlay";
 
 export function SiteFooter() {
   return (
@@ -32,7 +33,7 @@ export function SiteFooter() {
           <p className="eyebrow">A cleaner property starts here</p>
           <h2>Let’s build your service plan.</h2>
           <p>Tell us about your property and schedule. Our team will follow up with a tailored approach.</p>
-          <Link href="/contact/" className="button button-gold">Get a Free Quote</Link>
+          <QuoteCta className="button button-gold">Get a Free Quote</QuoteCta>
         </div>
       </div>
       <div className="container footer-bottom">

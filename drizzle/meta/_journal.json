@@ -71,6 +71,13 @@
       "when": 1784656626829,
       "tag": "0009_project_locations_repair",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1784731260995,
+      "tag": "0010_site_settings",
+      "breakpoints": true
     }
   ]
 }

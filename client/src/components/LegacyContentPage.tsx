@@ -6,6 +6,7 @@ import { getResponsiveMedia } from "@/content/responsive-media";
 import { company, featuredServices, getPageImage, isBlogArchivePath, normalizePath, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
 import { useLegacyContent } from "@/contexts/LegacyContentContext";
 import { ClientDataProvider } from "./ClientDataProvider";
+import { QuoteCta } from "./QuoteFormOverlay";
 import { trpc } from "@/lib/trpc";
 import type { InitialPublishedArticle } from "./PublicPage";
 
@@ -158,7 +159,7 @@ function InsightServicesSection({ articleTitle }: { articleTitle?: string }) {
         </div>
         <div className="insights-services-cta">
           <Link href="/cleaning-service-nyc/" className="button button-navy">Explore All Services</Link>
-          <Link href="/contact/" className="text-link">Request a tailored quote <ArrowRight size={16} aria-hidden="true" /></Link>
+          <QuoteCta className="text-link">Request a tailored quote <ArrowRight size={16} aria-hidden="true" /></QuoteCta>
         </div>
       </div>
     </section>
@@ -170,7 +171,7 @@ function LegacyArticlePage({ content }: { content: ArticleView }) {
   return <>
     <ClientLegacyHead content={content} />
     <section className="article-hero"><div className="container article-hero-inner"><div><p className="eyebrow light">NYC cleaning insights</p><h1>{content.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, "")}</h1>{publishedDate && <p className="article-date"><CalendarDays size={18} aria-hidden="true" />{publishedDate}</p>}</div><ArticleImage content={content} loading="eager" fetchPriority="high" /></div></section>
-    <section className="section"><div className="container article-layout"><article className="article-content"><ArticleBody content={content} /></article><aside className="service-aside"><ShieldCheck aria-hidden="true" /><h2>Need dependable property care?</h2><p>Tell us about your building, operating hours, and cleaning or maintenance priorities.</p><Link href="/contact/" className="button button-gold">Request a Quote</Link><a href={`tel:${company.phoneHref}`}>{company.phoneDisplay}</a></aside></div></section>
+    <section className="section"><div className="container article-layout"><article className="article-content"><ArticleBody content={content} /></article><aside className="service-aside"><ShieldCheck aria-hidden="true" /><h2>Need dependable property care?</h2><p>Tell us about your building, operating hours, and cleaning or maintenance priorities.</p><QuoteCta className="button button-gold">Request a Quote</QuoteCta><a href={`tel:${company.phoneHref}`}>{company.phoneDisplay}</a></aside></div></section>
     <InsightServicesSection articleTitle={content.title} />
     <section className="section insights-more-section"><div className="container review-invite"><div><p className="eyebrow">More NYC property insights</p><h2>Explore practical cleaning and maintenance guidance.</h2></div><Link href="/blog/" className="button button-navy">View All Articles</Link></div></section>
   </>;

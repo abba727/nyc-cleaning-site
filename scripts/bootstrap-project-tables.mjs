@@ -179,6 +179,24 @@ const TABLE_DEFINITIONS = [
       CONSTRAINT \`projectLocations_id\` PRIMARY KEY(\`id\`)
     );`,
   },
+  {
+    name: "siteSettings",
+    columns: [
+      "id",
+      "googleAnalyticsMeasurementId",
+      "googleTagManagerContainerId",
+      "createdAt",
+      "updatedAt",
+    ],
+    createSql: `CREATE TABLE IF NOT EXISTS \`siteSettings\` (
+      \`id\` int NOT NULL,
+      \`googleAnalyticsMeasurementId\` varchar(32),
+      \`googleTagManagerContainerId\` varchar(32),
+      \`createdAt\` timestamp NOT NULL DEFAULT (now()),
+      \`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+      CONSTRAINT \`siteSettings_id\` PRIMARY KEY(\`id\`)
+    );`,
+  },
 ];
 
 function sameArray(left, right) {
@@ -227,7 +245,7 @@ export async function bootstrapProjectTables(pool, databaseName) {
     }
   }
 
-  console.log("[project-bootstrap] verified projectImports and projectLocations without modifying legacy tables");
+  console.log("[project-bootstrap] verified projectImports, projectLocations, and siteSettings without modifying legacy tables");
 }
 
 async function main() {
