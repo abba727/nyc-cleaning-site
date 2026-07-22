@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { cn } from "@/lib/utils";
 
@@ -8,16 +8,66 @@ export type MapMarker = {
   longitude: number;
 };
 
+type MapCenter = [number, number];
+type GoogleLatLngLiteral = { lat: number; lng: number };
+
+type GoogleMapHandle = {
+  setCenter: (center: GoogleLatLngLiteral) => void;
+  setZoom: (zoom: number) => void;
+  fitBounds: (bounds: GoogleBounds, padding?: number) => void;
+};
+
+type GoogleBounds = {
+  extend: (position: GoogleLatLngLiteral) => void;
+};
+
+type GoogleCircle = {
+  setMap: (map: GoogleMapHandle | null) => void;
+};
+
+type GoogleMapsApi = {
+  Map: new (element: HTMLElement, options: {
+    center: GoogleLatLngLiteral;
+    zoom: number;
+    clickableIcons?: boolean;
+    fullscreenControl?: boolean;
+    mapTypeControl?: boolean;
+    streetViewControl?: boolean;
+    zoomControl?: boolean;
+    gestureHandling?: "auto" | "cooperative" | "greedy" | "none";
+  }) => GoogleMapHandle;
+  Circle: new (options: {
+    map: GoogleMapHandle;
+    center: GoogleLatLngLiteral;
+    radius: number;
+    clickable?: boolean;
+    strokeColor: string;
+    strokeOpacity: number;
+    strokeWeight: number;
+    fillColor: string;
+    fillOpacity: number;
+  }) => GoogleCircle;
+  LatLngBounds: new () => GoogleBounds;
+};
+
+declare global {
+  interface Window {
+    google?: { maps?: GoogleMapsApi };
+  }
+}
+
 interface MapViewProps {
   className?: string;
-  initialCenter?: Leaflet.LatLngExpression;
+  googleMapsApiKey?: string | null;
+  initialCenter?: MapCenter;
   initialZoom?: number;
   markers?: MapMarker[];
-  onMapReady?: (map: Leaflet.Map) => void;
+  onMapReady?: (map: Leaflet.Map | GoogleMapHandle) => void;
   onMapError?: () => void;
 }
 
-const NYC_CENTER: Leaflet.LatLngExpression = [40.7128, -74.006];
+const NYC_CENTER: MapCenter = [40.7128, -74.006];
+const GOOGLE_SCRIPT_ID = "nyc-cleaning-google-maps-sdk";
 const SERVICE_MARKER_STYLE: Leaflet.CircleMarkerOptions = {
   radius: 5.5,
   color: "#06285c",
@@ -26,11 +76,156 @@ const SERVICE_MARKER_STYLE: Leaflet.CircleMarkerOptions = {
   fillOpacity: 0.96,
 };
 
-/**
- * A public map renderer with no browser API key. Leaflet is loaded only in the
- * browser so server-rendered pages and metadata do not depend on browser APIs.
- */
-export function MapView({
+let googleMapsLoader: Promise<GoogleMapsApi> | null = null;
+
+function getValidMarkers(markers: MapMarker[]) {
+  return markers.filter(marker => (
+    Number.isFinite(marker.latitude)
+    && Number.isFinite(marker.longitude)
+    && marker.latitude >= -90
+    && marker.latitude <= 90
+    && marker.longitude >= -180
+    && marker.longitude <= 180
+  ));
+}
+
+function loadGoogleMaps(apiKey: string) {
+  const readyMaps = window.google?.maps;
+  if (readyMaps?.Map) return Promise.resolve(readyMaps);
+  if (googleMapsLoader) return googleMapsLoader;
+
+  googleMapsLoader = new Promise<GoogleMapsApi>((resolve, reject) => {
+    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
+    const script = existingScript || document.createElement("script");
+    let finished = false;
+
+    const fail = () => {
+      if (finished) return;
+      finished = true;
+      googleMapsLoader = null;
+      window.clearTimeout(timeout);
+      if (!existingScript) script.remove();
+      reject(new Error("Google Maps could not be loaded"));
+    };
+
+    const succeed = () => {
+      const maps = window.google?.maps;
+      if (finished || !maps?.Map) {
+        fail();
+        return;
+      }
+      finished = true;
+      window.clearTimeout(timeout);
+      resolve(maps);
+    };
+
+    const timeout = window.setTimeout(fail, 12_000);
+    script.addEventListener("load", succeed, { once: true });
+    script.addEventListener("error", fail, { once: true });
+
+    if (!existingScript) {
+      script.id = GOOGLE_SCRIPT_ID;
+      script.async = true;
+      script.defer = true;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly`;
+      document.head.appendChild(script);
+    }
+  });
+
+  return googleMapsLoader;
+}
+
+function GoogleMapView({
+  className,
+  googleMapsApiKey,
+  initialCenter = NYC_CENTER,
+  initialZoom = 11,
+  markers = [],
+  onMapReady,
+  onUnavailable,
+}: MapViewProps & { googleMapsApiKey: string; onUnavailable: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<GoogleMapHandle | null>(null);
+  const mapsRef = useRef<GoogleMapsApi | null>(null);
+  const circlesRef = useRef<GoogleCircle[]>([]);
+  const onMapReadyRef = useRef(onMapReady);
+  const [mapVersion, setMapVersion] = useState(0);
+
+  useEffect(() => {
+    onMapReadyRef.current = onMapReady;
+  }, [onMapReady]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || mapRef.current) return;
+    let disposed = false;
+
+    void loadGoogleMaps(googleMapsApiKey)
+      .then(maps => {
+        if (disposed) return;
+        const map = new maps.Map(container, {
+          center: { lat: initialCenter[0], lng: initialCenter[1] },
+          zoom: initialZoom,
+          clickableIcons: false,
+          fullscreenControl: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          zoomControl: true,
+          gestureHandling: "cooperative",
+        });
+        mapsRef.current = maps;
+        mapRef.current = map;
+        onMapReadyRef.current?.(map);
+        setMapVersion(version => version + 1);
+      })
+      .catch(() => {
+        if (!disposed) onUnavailable();
+      });
+
+    return () => {
+      disposed = true;
+      circlesRef.current.forEach(circle => circle.setMap(null));
+      circlesRef.current = [];
+      mapsRef.current = null;
+      mapRef.current = null;
+    };
+    // The initial view is intentionally applied only once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialZoom, onUnavailable]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const maps = mapsRef.current;
+    if (!map || !maps) return;
+
+    circlesRef.current.forEach(circle => circle.setMap(null));
+    const validMarkers = getValidMarkers(markers);
+    circlesRef.current = validMarkers.map(marker => new maps.Circle({
+      map,
+      center: { lat: marker.latitude, lng: marker.longitude },
+      radius: 65,
+      clickable: false,
+      strokeColor: "#06285c",
+      strokeOpacity: 1,
+      strokeWeight: 2,
+      fillColor: "#0a3d91",
+      fillOpacity: 0.9,
+    }));
+
+    if (validMarkers.length === 1) {
+      map.setCenter({ lat: validMarkers[0].latitude, lng: validMarkers[0].longitude });
+      map.setZoom(14);
+    } else if (validMarkers.length > 1) {
+      const bounds = new maps.LatLngBounds();
+      validMarkers.forEach(marker => bounds.extend({ lat: marker.latitude, lng: marker.longitude }));
+      map.fitBounds(bounds, 48);
+    }
+  }, [markers, mapVersion]);
+
+  return <div ref={containerRef} className={cn("h-[500px] w-full", className)} aria-label="Map of NYC Cleaning service locations" role="region" />;
+}
+
+function LeafletMapView({
   className,
   initialCenter = NYC_CENTER,
   initialZoom = 11,
@@ -87,9 +282,8 @@ export function MapView({
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  // The initial view is intentionally applied once; marker updates manage later bounds.
-  // This avoids tearing down the map when a parent rerenders with an equivalent array.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // The initial view is intentionally applied only once; marker updates manage later bounds.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialZoom]);
 
   useEffect(() => {
@@ -98,14 +292,7 @@ export function MapView({
     if (!map || !markerLayer) return;
 
     markerLayer.clearLayers();
-    const validMarkers = markers.filter(marker => (
-      Number.isFinite(marker.latitude)
-      && Number.isFinite(marker.longitude)
-      && marker.latitude >= -90
-      && marker.latitude <= 90
-      && marker.longitude >= -180
-      && marker.longitude <= 180
-    ));
+    const validMarkers = getValidMarkers(markers);
 
     void import("leaflet").then(({ default: L }) => {
       if (mapRef.current !== map || markerLayerRef.current !== markerLayer) return;
@@ -128,4 +315,25 @@ export function MapView({
   }, [markers, mapVersion]);
 
   return <div ref={containerRef} className={cn("h-[500px] w-full", className)} aria-label="Map of NYC Cleaning service locations" role="region" />;
+}
+
+/**
+ * The public map prefers the dedicated, domain-restricted Google Maps key. If
+ * that script cannot load, the existing Leaflet/OpenStreetMap renderer takes
+ * over automatically so the Service Area page remains usable.
+ */
+export function MapView({ googleMapsApiKey, ...props }: MapViewProps) {
+  const normalizedGoogleMapsApiKey = googleMapsApiKey?.trim() || "";
+  const [googleUnavailable, setGoogleUnavailable] = useState(false);
+  const handleGoogleUnavailable = useCallback(() => setGoogleUnavailable(true), []);
+
+  useEffect(() => {
+    setGoogleUnavailable(false);
+  }, [normalizedGoogleMapsApiKey]);
+
+  if (normalizedGoogleMapsApiKey && !googleUnavailable) {
+    return <GoogleMapView {...props} googleMapsApiKey={normalizedGoogleMapsApiKey} onUnavailable={handleGoogleUnavailable} />;
+  }
+
+  return <LeafletMapView {...props} />;
 }

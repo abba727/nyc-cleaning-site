@@ -23,5 +23,6 @@ export const ENV = {
   primaryAdminEmail: (process.env.PRIMARY_ADMIN_EMAIL ?? "info@nyccleaning.co").trim().toLowerCase(),
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL?.trim() ?? "",
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY?.trim() ?? "",
   appBaseUrl: (process.env.APP_BASE_URL ?? "https://www.nyccleaning.co").replace(/\/$/, ""),
 };

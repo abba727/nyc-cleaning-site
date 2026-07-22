@@ -250,6 +250,7 @@ type ServiceMapLocation = {
 
 function ServiceAreaMap() {
   const locations = trpc.projects.listLocations.useQuery(undefined, { retry: false });
+  const mapConfig = trpc.system.mapConfig.useQuery(undefined, { retry: false });
   const [mapTilesUnavailable, setMapTilesUnavailable] = useState(false);
   const locationData = (locations.data ?? []) as ServiceMapLocation[];
   const markers = locationData.flatMap(location => (
@@ -283,6 +284,7 @@ function ServiceAreaMap() {
   return <div className="map-container" style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--border)", background: "var(--background)", minHeight: "600px", position: "relative" }}>
     <MapView
       className="h-[600px]"
+      googleMapsApiKey={mapConfig.data?.googleMapsApiKey}
       initialCenter={[40.7128, -74.0060]}
       initialZoom={11}
       markers={markers}

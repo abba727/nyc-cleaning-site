@@ -90,7 +90,7 @@ p { margin: 0 0 1.2rem; }
 .section-contact { background: var(--navy-2); color: var(--white); }
 .section-heading { max-width: 760px; margin-bottom: 2.6rem; }
 .section-heading.split { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr); gap: 4rem; max-width: none; align-items: end; }
-.section-heading.split > p { color: var(--muted); font-size: 1.08rem; }
+.section-heading.split > p { color: #334b5c; font-size: 1.08rem; font-weight: 600; }
 .center-action { display: flex; justify-content: center; margin-top: 2.6rem; }
 
 .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 0.5rem; border: 1px solid transparent; border-radius: 3px; padding: 0.75rem 1.25rem; font-family: "Archivo", sans-serif; font-size: 0.86rem; font-weight: 800; letter-spacing: 0.02em; cursor: pointer; }
