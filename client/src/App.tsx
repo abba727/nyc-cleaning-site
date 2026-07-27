@@ -6,7 +6,6 @@ import { SiteHeader } from "./components/SiteHeader";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LegacyContentProvider, type LegacyContentPayload } from "./contexts/LegacyContentContext";
 import { QuoteFormOverlayProvider } from "./components/QuoteFormOverlay";
-import { TrackingInitializer } from "./components/TrackingInitializer";
 import Home from "./pages/Home";
 import ThankYou from "./pages/ThankYou";
 import type { InitialPublishedArticle, LegacyContentPageRenderer } from "./components/PublicPage";
@@ -27,7 +26,6 @@ function Router({ initialArticle, initialNotFoundPath, initialInsights, initialL
     <SiteHeader />
     <main>{isThankYou ? <ThankYou /> : <Home initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} initialInsights={initialInsights} initialLegacyRenderer={initialLegacyRenderer} />}</main>
     <SiteFooter />
-    <TrackingInitializer />
   </div></QuoteFormOverlayProvider>;
 }
 

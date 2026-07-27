@@ -13,13 +13,49 @@ import { responsiveMedia } from "./content/responsive-media";
 import { company, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
 import { getArchiveSeo, getLegacySeo, getPageSeo } from "./content/seo";
 import type { LegacyContentPayload } from "./contexts/LegacyContentContext";
-import { getPublishedArticleByPath } from "../../server/db";
+import { getPublishedArticleByPath, getSiteSettings } from "../../server/db";
 import { toPublicMediaUrl } from "../../server/storage";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 const ARTICLE_LOOKUP_TIMEOUT_MS = 2_000;
 const THANK_YOU_PATH = "/thank-you/";
+const GA4_MEASUREMENT_ID = /^G-[A-Z0-9-]+$/;
+const GTM_CONTAINER_ID = /^GTM-[A-Z0-9-]+$/;
+
+type TrackingSettings = {
+  googleAnalyticsMeasurementId: string | null;
+  googleTagManagerContainerId: string | null;
+};
+
+/**
+ * Start the configured tracking container asynchronously from the initial
+ * document, matching the prior production timing. Deferring its injection
+ * until post-render caused GTM execution to overlap the homepage LCP window.
+ */
+function getTrackingMarkup(settings: TrackingSettings | null) {
+  const measurementId = settings?.googleAnalyticsMeasurementId?.trim().toUpperCase() || "";
+  const containerId = settings?.googleTagManagerContainerId?.trim().toUpperCase() || "";
+
+  if (GTM_CONTAINER_ID.test(containerId)) {
+    const safeContainerId = escapeHtml(containerId);
+    return {
+      head: `<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${safeContainerId}');</script>`,
+      body: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${safeContainerId}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
+    };
+  }
+
+  if (GA4_MEASUREMENT_ID.test(measurementId)) {
+    const safeMeasurementId = escapeHtml(measurementId);
+    return {
+      head: `<script async src="https://www.googletagmanager.com/gtag/js?id=${safeMeasurementId}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${safeMeasurementId}');</script>`,
+      body: "",
+    };
+  }
+
+  return { head: "", body: "" };
+}
+
 async function getCmsArticleForRender(pathname: string) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -48,6 +84,8 @@ export async function render(url: string) {
   const isSyntheticArchive = isBlogArchivePath(pathname);
   const isThankYou = pathname === THANK_YOU_PATH;
   const isAdminPath = pathname === "/admin/" || pathname.startsWith("/admin/");
+  const trackingSettings = isAdminPath ? null : await getSiteSettings().catch(() => null);
+  const trackingMarkup = getTrackingMarkup(trackingSettings);
   const cmsArticle = !isAdminPath && !isThankYou && !matchedPage && !matchedLegacy && !isSyntheticArchive
     ? await getCmsArticleForRender(pathname)
     : undefined;
@@ -72,7 +110,7 @@ export async function render(url: string) {
     : null;
   // Existing insight and archive routes need the same eager route tree during
   // SSR and hydration; ordinary public pages remain on the lazy client split.
-  const needsEagerLegacyRenderer = Boolean(cmsArticle || legacyPayload);
+  const needsEagerLegacyRenderer = Boolean(cmsArticle || legacyPayload || isNotFound);
   const queryClient = new QueryClient();
   const trpcClient = trpc.createClient({ links: [httpBatchLink({ url: `${siteOrigin}/api/trpc`, transformer: superjson })] });
   const html = renderToString(
@@ -146,6 +184,7 @@ export async function render(url: string) {
 
   const head = [
     `<title>${escapeHtml(seo.title)}</title>`,
+    trackingMarkup.head,
     `<meta name="description" content="${escapeHtml(seo.description)}" />`,
     `<meta name="robots" content="${isNotFound || seo.indexable === false ? "noindex, follow" : "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"}" />`,
     `<link rel="canonical" href="${canonical}" />`,
@@ -167,5 +206,5 @@ export async function render(url: string) {
     `<meta name="twitter:image" content="${imageUrl}" />`,
     `<script type="application/ld+json">${safeJson(schema)}</script>`,
   ].filter(Boolean).join("\n    ");
-  return { html, head, body: "", status: isNotFound ? 404 : 200 };
+  return { html, head, body: trackingMarkup.body, status: isNotFound ? 404 : 200 };
 }

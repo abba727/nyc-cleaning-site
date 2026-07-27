@@ -18,7 +18,7 @@ async function bootstrap() {
   // CMS and existing legacy insight pages are server-rendered for search
   // visibility. Load their renderer before hydration so React receives the same
   // element tree, while keeping the archive/editorial module off other routes.
-  if (initialArticle || window.__NYC_LEGACY_CONTENT__) {
+  if (initialArticle || window.__NYC_LEGACY_CONTENT__ || window.__INITIAL_NOT_FOUND_PATH__) {
     try {
       const module = await import("./components/LegacyContentPage");
       initialLegacyRenderer = module.default;

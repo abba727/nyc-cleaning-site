@@ -131,20 +131,30 @@ describe("CMS Insight SSR hydration", () => {
   });
 });
 
-describe("deferred CMS tracking", () => {
+describe("server-rendered tracking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.getPublishedArticleByPath.mockResolvedValue(null);
     dbMocks.listPublishedArticles.mockResolvedValue([]);
   });
 
-  it("does not block the public SSR document on optional tracking configuration", async () => {
+  it("starts the configured GTM container asynchronously in the initial public document", async () => {
     dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: "GTM-TEST123" });
 
     const result = await render("/");
 
+    expect(result.head).toContain("googletagmanager.com/gtm.js?id=");
+    expect(result.head).toContain("GTM-TEST123");
+    expect(result.body).toContain("googletagmanager.com/ns.html?id=GTM-TEST123");
+    expect(dbMocks.getSiteSettings).toHaveBeenCalledOnce();
+  });
+
+  it("does not emit public tracking markup for the admin route", async () => {
+    dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: "GTM-TEST123" });
+
+    const result = await render("/admin/");
+
     expect(result.head).not.toContain("googletagmanager.com");
-    expect(result.head).not.toContain("G-TEST12345");
     expect(result.body).toBe("");
     expect(dbMocks.getSiteSettings).not.toHaveBeenCalled();
   });
