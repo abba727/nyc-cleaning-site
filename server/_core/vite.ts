@@ -4,6 +4,7 @@ import { type Server } from "http";
 import { nanoid } from "nanoid";
 import path from "path";
 import { render as renderProduction } from "../../client/src/entry-server";
+import { getSsrCacheControl } from "./publicSsrCache";
 
 export async function setupVite(app: Express, server: Server) {
   // Keep development-only Vite packages out of the production startup path.
@@ -53,7 +54,7 @@ export async function setupVite(app: Express, server: Server) {
         .replace("<!--app-head-->", rendered.head)
         .replace("<!--app-html-->", rendered.html)
         .replace("<!--analytics-script-->", rendered.body);
-      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
+      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": getSsrCacheControl({ method: req.method, originalUrl: req.originalUrl, status: rendered.status }) }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);
@@ -82,7 +83,7 @@ export function serveStatic(app: Express) {
         .replace("<!--app-head-->", rendered.head)
         .replace("<!--app-html-->", rendered.html)
         .replace("<!--analytics-script-->", rendered.body);
-      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": "no-store" }).end(page);
+      res.status(rendered.status).set({ "Content-Type": "text/html", "Cache-Control": getSsrCacheControl({ method: req.method, originalUrl: req.originalUrl, status: rendered.status }) }).end(page);
     } catch (error) {
       next(error);
     }

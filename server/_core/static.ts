@@ -3,6 +3,7 @@ import express, { type Express } from "express";
 import fs from "fs";
 import path from "path";
 import { render as renderProduction } from "../../client/src/entry-server";
+import { getSsrCacheControl } from "./publicSsrCache";
 
 /**
  * Serves the pre-built client and SSR output in production. This module has no
@@ -57,7 +58,7 @@ export function serveStatic(app: Express) {
         .status(rendered.status)
         .set({
           "Content-Type": "text/html",
-          "Cache-Control": "no-cache",
+          "Cache-Control": getSsrCacheControl({ method: req.method, originalUrl: req.originalUrl, status: rendered.status }),
         })
         .end(page);
     } catch (error) {
