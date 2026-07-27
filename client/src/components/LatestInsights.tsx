@@ -10,16 +10,21 @@ type LatestInsightsResponse = {
   insights?: ArticleCardContent[];
 };
 
+// Keep the omitted-prop default referentially stable. A component-level `[]`
+// creates a new effect dependency after every render and can cause repeat fetches.
+const EMPTY_INSIGHTS: ArticleCardContent[] = [];
+
 /**
  * Homepage insight cards deliberately load outside the critical rendering path.
  * The server sends the structural, crawlable page immediately, then this small
  * client chunk requests only the three cards visible on the homepage.
  */
-export default function LatestInsights({ initialInsights = [] }: LatestInsightsProps) {
+export default function LatestInsights({ initialInsights = EMPTY_INSIGHTS }: LatestInsightsProps) {
   const [insights, setInsights] = useState(() => initialInsights.slice(0, 3));
+  const hasInitialInsights = initialInsights.length > 0;
 
   useEffect(() => {
-    if (initialInsights.length > 0) return;
+    if (hasInitialInsights) return;
 
     const controller = new AbortController();
     void fetch("/api/homepage-insights", { signal: controller.signal })
@@ -35,7 +40,7 @@ export default function LatestInsights({ initialInsights = [] }: LatestInsightsP
       });
 
     return () => controller.abort();
-  }, [initialInsights]);
+  }, [hasInitialInsights]);
 
   if (insights.length === 0) return null;
 
