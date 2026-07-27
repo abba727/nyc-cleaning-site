@@ -44,7 +44,7 @@ describe("CMS Insight SSR hydration", () => {
     expect(result.head).toContain('"dateModified":"2026-07-17T01:00:00.000Z"');
   });
 
-  it("server-renders the latest three published insights on the homepage", async () => {
+  it("defers homepage insights until after the initial SSR response", async () => {
     dbMocks.listPublishedArticles.mockResolvedValue([
       {
         path: "/latest-insight-one/",
@@ -94,12 +94,14 @@ describe("CMS Insight SSR hydration", () => {
 
     const result = await render("/");
     expect(result.status).toBe(200);
-    expect(result.html).toContain("The latest guidance from our team.");
-    expect(result.html).toContain("Latest Insight One");
-    expect(result.html).toContain("Latest Insight Two");
-    expect(result.html).toContain("Latest Insight Three");
-    expect(result.html).not.toContain("Older Insight");
-    expect(result.head).toContain("window.__INITIAL_INSIGHTS__=");
+    // Insight cards are loaded by the idle client boundary through the compact
+    // /api/homepage-insights endpoint, rather than delaying the HTML response.
+    expect(result.html).not.toContain("The latest guidance from our team.");
+    expect(result.html).not.toContain("Latest Insight One");
+    expect(result.html).not.toContain("Latest Insight Two");
+    expect(result.html).not.toContain("Latest Insight Three");
+    expect(result.head).not.toContain("window.__INITIAL_INSIGHTS__=");
+    expect(dbMocks.listPublishedArticles).not.toHaveBeenCalled();
   });
 
   it("escapes serialized article content so it cannot terminate the state script", async () => {
@@ -129,31 +131,21 @@ describe("CMS Insight SSR hydration", () => {
   });
 });
 
-describe("CMS tracking SSR", () => {
+describe("deferred CMS tracking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMocks.getPublishedArticleByPath.mockResolvedValue(null);
     dbMocks.listPublishedArticles.mockResolvedValue([]);
   });
 
-  it("renders a direct GA4 tag when only a valid Measurement ID is configured", async () => {
-    dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: null });
-
-    const result = await render("/");
-
-    expect(result.head).toContain("https://www.googletagmanager.com/gtag/js?id=G-TEST12345");
-    expect(result.head).toContain("gtag('config','G-TEST12345')");
-    expect(result.body).toBe("");
-  });
-
-  it("prefers the GTM container and avoids emitting a duplicate direct GA4 tag", async () => {
+  it("does not block the public SSR document on optional tracking configuration", async () => {
     dbMocks.getSiteSettings.mockResolvedValue({ googleAnalyticsMeasurementId: "G-TEST12345", googleTagManagerContainerId: "GTM-TEST123" });
 
     const result = await render("/");
 
-    expect(result.head).toContain("googletagmanager.com/gtm.js?id='+i+dl");
-    expect(result.head).toContain("GTM-TEST123");
-    expect(result.head).not.toContain("gtag/js?id=G-TEST12345");
-    expect(result.body).toContain("https://www.googletagmanager.com/ns.html?id=GTM-TEST123");
+    expect(result.head).not.toContain("googletagmanager.com");
+    expect(result.head).not.toContain("G-TEST12345");
+    expect(result.body).toBe("");
+    expect(dbMocks.getSiteSettings).not.toHaveBeenCalled();
   });
 });

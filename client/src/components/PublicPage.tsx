@@ -1,14 +1,15 @@
-import { lazy, Suspense, type ImgHTMLAttributes, useEffect, useState } from "react";
+import { lazy, Suspense, type ComponentType, type ImgHTMLAttributes, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
 import { QuoteCta } from "./QuoteFormOverlay";
 const LazyMapView = lazy(() => import("./Map").then(module => ({ default: module.MapView })));
 import { ClientDataProvider } from "./ClientDataProvider";
-import LegacyContentPage, { ArticleCard, databaseArticleToView } from "./LegacyContentPage";
 import { trpc } from "@/lib/trpc";
-import { useLegacyContent } from "@/contexts/LegacyContentContext";
-import { brandAssets } from "@/content/assets";
+
+const LazyLegacyContentPage = lazy(() => import("./LegacyContentPage"));
+const LazyServiceAreaPage = lazy(() => import("./ServiceAreaPage"));
+const LazyLatestInsights = lazy(() => import("./LatestInsights"));
 import { getResponsiveMedia } from "@/content/responsive-media";
 import { company, featuredServices, getPageByPath, getPageImage, homepageServices, isBlogArchivePath, normalizePath, pageParagraphs, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
 import { getServiceContent } from "@/content/service-content";
@@ -25,6 +26,41 @@ export type InitialPublishedArticle = {
   coverImageAlt: string;
   publishedAt: Date | string | null;
 };
+
+export type LegacyContentPageRenderer = ComponentType<{
+  path: string;
+  initialArticle?: InitialPublishedArticle | null;
+  initialNotFoundPath?: string | null;
+}>;
+
+/**
+ * Keep nonessential editorial cards out of the homepage critical path. The
+ * component chunk and its compact card request begin only when the browser is
+ * idle, preserving a fast first render while retaining the homepage section.
+ */
+function DeferredLatestInsights({ initialInsights }: { initialInsights?: InitialPublishedArticle[] }) {
+  const [shouldLoad, setShouldLoad] = useState(Boolean(initialInsights?.length));
+
+  useEffect(() => {
+    if (initialInsights?.length) return;
+
+    let fallbackTimer: number | undefined;
+    let idleHandle: number | undefined;
+    if (window.requestIdleCallback) {
+      idleHandle = window.requestIdleCallback(() => setShouldLoad(true), { timeout: 2_500 });
+    } else {
+      fallbackTimer = window.setTimeout(() => setShouldLoad(true), 1_200);
+    }
+
+    return () => {
+      if (idleHandle !== undefined) window.cancelIdleCallback?.(idleHandle);
+      if (fallbackTimer !== undefined) window.clearTimeout(fallbackTimer);
+    };
+  }, [initialInsights]);
+
+  if (!shouldLoad) return null;
+  return <Suspense fallback={null}><LazyLatestInsights initialInsights={initialInsights} /></Suspense>;
+}
 
 function ClientHead({ page }: { page: SitePage }) {
   useEffect(() => {
@@ -65,16 +101,6 @@ function TrustStrip() {
 }
 
 function HomePage({ page, initialInsights }: { page: SitePage; initialInsights?: InitialPublishedArticle[] }) {
-  const { payload } = useLegacyContent();
-  const initialInsightArticles = initialInsights?.map(databaseArticleToView) || [];
-  const staticArticles = payload?.content.filter(item => item.kind === "article") || [];
-  // Homepage cards are delivered by SSR when the CMS is available. Falling back
-  // to static content avoids reintroducing a large article-list API request into
-  // the critical client-side dependency chain if the server lookup times out.
-  const insightSource = initialInsightArticles.length
-    ? initialInsightArticles
-    : [...staticArticles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  const latestInsights = insightSource.slice(0, 3);
   return <>
     <section className="home-hero">
       <ResponsiveImage src={getPageImage(page)} alt="Professional NYC Cleaning team maintaining a New York commercial property" className="hero-bg" loading="eager" fetchPriority="high" width={1920} height={823} />
@@ -87,27 +113,7 @@ function HomePage({ page, initialInsights }: { page: SitePage; initialInsights?:
     <section className="section section-navy"><div className="container story-grid"><div className="story-image"><ResponsiveImage src={getPageImage(getPageByPath("/who-we-are/") || page)} alt="NYC Cleaning and Maintenance team serving a New York property" loading="lazy" decoding="async" /><div className="image-note"><strong>Established in 2020</strong><span>Built by property-operations professionals</span></div></div><div className="story-copy"><p className="eyebrow light">A property-minded cleaning partner</p><h2>Clean, safe spaces strengthen New York communities.</h2><p>NYC Cleaning and Maintenance partners with landlords and property managers to deliver dependable cleaning and maintenance, one property at a time.</p><ul className="check-list"><li><CheckCircle2 />Custom schedules around building operations</li><li><CheckCircle2 />Coverage for commercial and residential assets</li><li><CheckCircle2 />Cleaning, waste handling, staffing, and maintenance</li></ul><Link href="/who-we-are/" className="button button-gold">Meet NYC Cleaning</Link></div></div></section>
     <section className="section"><div className="container process-layout"><div><p className="eyebrow">Simple, accountable service</p><h2>From walkthrough to a cleaner property.</h2></div><ol className="process-list"><li><span>01</span><div><h3>Tell us about the property</h3><p>Share the building type, schedule, priorities, and current challenges.</p></div></li><li><span>02</span><div><h3>Review a tailored plan</h3><p>We align services and frequency with your operations and budget.</p></div></li><li><span>03</span><div><h3>Put the team to work</h3><p>Our staff delivers the agreed scope with responsive ongoing support.</p></div></li></ol></div></section>
     <section className="section section-contact"><div className="container contact-band"><div><p className="eyebrow light">Let’s talk about your property</p><h2>Get a cleaning and maintenance plan designed for your building.</h2><p>Send your details and our team will follow up to learn more about your service needs.</p><a href={`tel:${company.phoneHref}`} className="phone-link">{company.phoneDisplay}</a></div><InquiryForm compact sourcePath="/" /></div></section>
-    {latestInsights.length > 0 && (
-      <section className="section section-cream">
-        <div className="container">
-          <div className="section-heading split">
-            <div>
-              <p className="eyebrow">Property insights</p>
-              <h2>The latest guidance from our team.</h2>
-            </div>
-            <p>Practical strategies and property-care insights designed to help New York property managers and facility teams.</p>
-          </div>
-          <div className="article-grid">
-            {latestInsights.map((article, index) => (
-              <ArticleCard key={article.path} article={article} index={index} />
-            ))}
-          </div>
-          <div className="center-action" style={{ marginTop: "clamp(2rem, 4vw, 3.25rem)" }}>
-            <Link href="/blog/" className="button button-navy">View All Insights</Link>
-          </div>
-        </div>
-      </section>
-    )}
+    <DeferredLatestInsights initialInsights={initialInsights} />
   </>;
 }
 
@@ -346,14 +352,22 @@ function ServiceAreaPageWithData({ page }: { page: SitePage }) {
   return <ClientDataProvider><ServiceAreaPage page={page} /></ClientDataProvider>;
 }
 
-function LegacyRoute({ path, initialArticle, initialNotFoundPath }: { path: string; initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null }) {
-  return <LegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
+function LegacyRoute({ path, initialArticle, initialNotFoundPath, initialLegacyRenderer }: { path: string; initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null; initialLegacyRenderer?: LegacyContentPageRenderer }) {
+  if (initialLegacyRenderer) {
+    const InitialLegacyRenderer = initialLegacyRenderer;
+    return <InitialLegacyRenderer path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
+  }
+  return <Suspense fallback={<main className="section" aria-busy="true" />}><LazyLegacyContentPage path={path} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} /></Suspense>;
 }
 
-export function PublicPage({ initialArticle, initialNotFoundPath, initialInsights }: { initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null; initialInsights?: InitialPublishedArticle[] } = {}) {
+function ServiceAreaRoute({ page }: { page: SitePage }) {
+  return <Suspense fallback={<main className="section" aria-busy="true" />}><LazyServiceAreaPage page={page} /></Suspense>;
+}
+
+export function PublicPage({ initialArticle, initialNotFoundPath, initialInsights, initialLegacyRenderer }: { initialArticle?: InitialPublishedArticle | null; initialNotFoundPath?: string | null; initialInsights?: InitialPublishedArticle[]; initialLegacyRenderer?: LegacyContentPageRenderer } = {}) {
   const [location] = useLocation();
-  if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
+  if (isBlogArchivePath(location)) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} initialLegacyRenderer={initialLegacyRenderer} />;
   const page = getPageByPath(location);
-  if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} />;
-  return <><ClientHead page={page} />{page.path === "/" ? <HomePageWithData page={page} initialInsights={initialInsights} /> : page.path === "/contact/" ? <ContactPage page={page} /> : page.path === "/we-serve-new-york/" ? <ServiceAreaPageWithData page={page} /> : page.path === "/who-we-are/" ? <WhoWeArePage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
+  if (!page) return <LegacyRoute path={location} initialArticle={initialArticle} initialNotFoundPath={initialNotFoundPath} initialLegacyRenderer={initialLegacyRenderer} />;
+  return <><ClientHead page={page} />{page.path === "/" ? <HomePageWithData page={page} initialInsights={initialInsights} /> : page.path === "/contact/" ? <ContactPage page={page} /> : page.path === "/we-serve-new-york/" ? <ServiceAreaRoute page={page} /> : page.path === "/who-we-are/" ? <WhoWeArePage page={page} /> : page.kind === "service" && page.path !== "/cleaning-service-nyc/" ? <ServiceDetailPage page={page} /> : <StandardPage page={page} />}</>;
 }

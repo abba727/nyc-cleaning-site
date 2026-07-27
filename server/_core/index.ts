@@ -10,6 +10,11 @@ import { appRouter, submitPublicInquiry } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
 import { registerSeoRoutes } from "../seoRoutes";
+import { getSiteSettings, listPublishedArticles } from "../db";
+import { toPublicMediaUrl } from "../storage";
+
+const GA4_MEASUREMENT_ID = /^G-[A-Z0-9-]+$/;
+const GTM_CONTAINER_ID = /^GTM-[A-Z0-9-]+$/;
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -41,6 +46,36 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerSeoRoutes(app);
+  app.get("/api/tracking-config", async (_req, res) => {
+    try {
+      const settings = await getSiteSettings();
+      const measurementId = settings.googleAnalyticsMeasurementId?.trim().toUpperCase() || "";
+      const containerId = settings.googleTagManagerContainerId?.trim().toUpperCase() || "";
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.status(200).json({
+        googleAnalyticsMeasurementId: GA4_MEASUREMENT_ID.test(measurementId) ? measurementId : null,
+        googleTagManagerContainerId: GTM_CONTAINER_ID.test(containerId) ? containerId : null,
+      });
+    } catch (error) {
+      console.error("[Tracking] Public tracking configuration could not be loaded", error);
+      res.status(204).end();
+    }
+  });
+  app.get("/api/homepage-insights", async (_req, res) => {
+    try {
+      const insights = await listPublishedArticles(3);
+      res.set("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+      res.status(200).json({
+        insights: insights.map(insight => ({
+          ...insight,
+          coverImageUrl: insight.coverImageUrl ? toPublicMediaUrl(insight.coverImageUrl) : null,
+        })),
+      });
+    } catch (error) {
+      console.error("[Insights] Public homepage cards could not be loaded", error);
+      res.status(204).end();
+    }
+  });
   app.post("/api/inquiry", async (req, res) => {
     try {
       const result = await submitPublicInquiry(req.body);

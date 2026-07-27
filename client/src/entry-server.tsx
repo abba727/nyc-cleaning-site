@@ -6,50 +6,20 @@ import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import { trpc } from "@/lib/trpc";
 import App from "./App";
+import LegacyContentPage from "./components/LegacyContentPage";
 import { brandAssets } from "./content/assets";
 import { getArticleImage, getLegacyByPath, legacyArticleImages, legacyContent } from "./content/legacy-content";
 import { responsiveMedia } from "./content/responsive-media";
 import { company, getPageByPath, getPageImage, isBlogArchivePath, normalizePath, pages, siteOrigin } from "./content/site";
 import { getArchiveSeo, getLegacySeo, getPageSeo } from "./content/seo";
 import type { LegacyContentPayload } from "./contexts/LegacyContentContext";
-import { getPublishedArticleByPath, getSiteSettings, listPublishedArticles } from "../../server/db";
+import { getPublishedArticleByPath } from "../../server/db";
 import { toPublicMediaUrl } from "../../server/storage";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character] || character);
 const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, "\\u003c");
 const ARTICLE_LOOKUP_TIMEOUT_MS = 2_000;
 const THANK_YOU_PATH = "/thank-you/";
-const GA4_MEASUREMENT_ID = /^G-[A-Z0-9-]+$/;
-const GTM_CONTAINER_ID = /^GTM-[A-Z0-9-]+$/;
-
-type TrackingSettings = {
-  googleAnalyticsMeasurementId: string | null;
-  googleTagManagerContainerId: string | null;
-};
-
-function getTrackingMarkup(settings: TrackingSettings | null) {
-  const measurementId = settings?.googleAnalyticsMeasurementId?.trim().toUpperCase() || "";
-  const containerId = settings?.googleTagManagerContainerId?.trim().toUpperCase() || "";
-
-  if (GTM_CONTAINER_ID.test(containerId)) {
-    const safeContainerId = escapeHtml(containerId);
-    return {
-      head: `<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','${safeContainerId}');</script>`,
-      body: `<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=${safeContainerId}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>`,
-    };
-  }
-
-  if (GA4_MEASUREMENT_ID.test(measurementId)) {
-    const safeMeasurementId = escapeHtml(measurementId);
-    return {
-      head: `<script async src="https://www.googletagmanager.com/gtag/js?id=${safeMeasurementId}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${safeMeasurementId}');</script>`,
-      body: "",
-    };
-  }
-
-  return { head: "", body: "" };
-}
-
 async function getCmsArticleForRender(pathname: string) {
   let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -67,23 +37,6 @@ async function getCmsArticleForRender(pathname: string) {
   }
 }
 
-async function getLatestCmsArticlesForRender() {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    const articles = await Promise.race([
-      listPublishedArticles(),
-      new Promise<undefined>(resolve => {
-        timeout = setTimeout(() => resolve(undefined), ARTICLE_LOOKUP_TIMEOUT_MS);
-      }),
-    ]);
-    return articles ? articles.slice(0, 3).map(article => ({ ...article, coverImageUrl: toPublicMediaUrl(article.coverImageUrl) })) : [];
-  } catch {
-    return [];
-  } finally {
-    if (timeout) clearTimeout(timeout);
-  }
-}
-
 export function isKnownPublicPath(url: string) {
   return Boolean(getPageByPath(url) || getLegacyByPath(url) || isBlogArchivePath(url) || normalizePath(url) === THANK_YOU_PATH);
 }
@@ -95,17 +48,10 @@ export async function render(url: string) {
   const isSyntheticArchive = isBlogArchivePath(pathname);
   const isThankYou = pathname === THANK_YOU_PATH;
   const isAdminPath = pathname === "/admin/" || pathname.startsWith("/admin/");
-  const trackingSettings = isAdminPath
-    ? null
-    : await getSiteSettings().catch(error => {
-      console.error("[Tracking] CMS settings could not be loaded", error);
-      return null;
-    });
-  const trackingMarkup = getTrackingMarkup(trackingSettings);
   const cmsArticle = !isAdminPath && !isThankYou && !matchedPage && !matchedLegacy && !isSyntheticArchive
     ? await getCmsArticleForRender(pathname)
     : undefined;
-  const initialInsights = pathname === "/" ? await getLatestCmsArticlesForRender() : [];
+  const initialInsights: [] = [];
   const page = matchedPage || pages[0];
   const isNotFound = !isAdminPath && !isThankYou && !matchedPage && !matchedLegacy && !isSyntheticArchive && !cmsArticle;
   const seo = isAdminPath
@@ -124,13 +70,16 @@ export async function render(url: string) {
   const legacyPayload: LegacyContentPayload | null = matchedLegacy || isSyntheticArchive
     ? { content: legacyContent, images: legacyArticleImages }
     : null;
+  // Existing insight and archive routes need the same eager route tree during
+  // SSR and hydration; ordinary public pages remain on the lazy client split.
+  const needsEagerLegacyRenderer = Boolean(cmsArticle || legacyPayload);
   const queryClient = new QueryClient();
   const trpcClient = trpc.createClient({ links: [httpBatchLink({ url: `${siteOrigin}/api/trpc`, transformer: superjson })] });
   const html = renderToString(
     <React.StrictMode>
       <Router ssrPath={pathname}>
         <trpc.Provider client={trpcClient} queryClient={queryClient}>
-          <QueryClientProvider client={queryClient}><App legacyContent={legacyPayload} initialArticle={cmsArticle || null} initialNotFoundPath={isNotFound ? pathname : null} initialInsights={initialInsights} /></QueryClientProvider>
+          <QueryClientProvider client={queryClient}><App legacyContent={legacyPayload} initialArticle={cmsArticle || null} initialNotFoundPath={isNotFound ? pathname : null} initialInsights={initialInsights} initialLegacyRenderer={needsEagerLegacyRenderer ? LegacyContentPage : undefined} /></QueryClientProvider>
         </trpc.Provider>
       </Router>
     </React.StrictMode>
@@ -217,7 +166,6 @@ export async function render(url: string) {
     `<meta name="twitter:description" content="${escapeHtml(seo.description)}" />`,
     `<meta name="twitter:image" content="${imageUrl}" />`,
     `<script type="application/ld+json">${safeJson(schema)}</script>`,
-    trackingMarkup.head,
   ].filter(Boolean).join("\n    ");
-  return { html, head, body: trackingMarkup.body, status: isNotFound ? 404 : 200 };
+  return { html, head, body: "", status: isNotFound ? 404 : 200 };
 }

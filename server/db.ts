@@ -222,11 +222,11 @@ export async function countRecentInquiriesByEmail(email: string, since: Date) {
   return rows[0]?.value ?? 0;
 }
 
-export async function listPublishedArticles() {
+export async function listPublishedArticles(limit?: number) {
   const db = await getDb();
   if (!db) throw new Error("Database is not available");
   const now = new Date();
-  return db
+  const query = db
     .select({
       path: articles.path,
       title: articles.title,
@@ -242,6 +242,8 @@ export async function listPublishedArticles() {
       or(isNull(articles.publishedAt), lte(articles.publishedAt, now)),
     ))
     .orderBy(desc(articles.publishedAt), desc(articles.id));
+
+  return typeof limit === "number" ? query.limit(limit) : query;
 }
 
 export async function getPublishedArticleByPath(path: string) {
@@ -437,7 +439,14 @@ export const defaultSiteSettings = {
   googleTagManagerContainerId: null as string | null,
 };
 
+const SITE_SETTINGS_CACHE_TTL_MS = 60_000;
+let cachedSiteSettings: typeof defaultSiteSettings | null = null;
+let siteSettingsCacheExpiresAt = 0;
+
 export async function getSiteSettings() {
+  const now = Date.now();
+  if (cachedSiteSettings && now < siteSettingsCacheExpiresAt) return cachedSiteSettings;
+
   const db = await getDb();
   if (!db) return defaultSiteSettings;
 
@@ -450,7 +459,9 @@ export async function getSiteSettings() {
     .where(eq(siteSettings.id, 1))
     .limit(1);
 
-  return rows[0] ?? defaultSiteSettings;
+  cachedSiteSettings = rows[0] ?? defaultSiteSettings;
+  siteSettingsCacheExpiresAt = now + SITE_SETTINGS_CACHE_TTL_MS;
+  return cachedSiteSettings;
 }
 
 export async function updateSiteSettings(input: {
@@ -464,5 +475,7 @@ export async function updateSiteSettings(input: {
     set: input,
   });
 
-  return getSiteSettings();
+  cachedSiteSettings = { ...input };
+  siteSettingsCacheExpiresAt = Date.now() + SITE_SETTINGS_CACHE_TTL_MS;
+  return cachedSiteSettings;
 }

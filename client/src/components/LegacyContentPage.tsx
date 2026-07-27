@@ -8,6 +8,7 @@ import { useLegacyContent } from "@/contexts/LegacyContentContext";
 import { ClientDataProvider } from "./ClientDataProvider";
 import { QuoteCta } from "./QuoteFormOverlay";
 import { trpc } from "@/lib/trpc";
+import { ArticleCard } from "./ArticleCard";
 import type { InitialPublishedArticle } from "./PublicPage";
 
 type ArticleView = LegacyContent & { coverImageUrl?: string; coverImageAlt?: string };
@@ -117,30 +118,6 @@ function ServiceHighlightImage({ service }: { service: SitePage }) {
   </picture>;
 }
 
-export function ArticleCard({ article, index }: { article: ArticleView; index?: number }) {
-  const publishedDate = formatPublicationDate(article.publishedAt);
-  const articleTitle = article.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, "");
-  void index;
-  return (
-    <article className="article-card">
-      <Link href={article.path} className="article-card-image" aria-label={`Read ${articleTitle}`}>
-        <ArticleImage content={article} loading="lazy" fetchPriority="low" />
-        <span className="article-card-image-shade" aria-hidden="true" />
-      </Link>
-      <div className="article-card-body">
-        <p className="article-card-meta">
-          {publishedDate ? <><CalendarDays size={15} aria-hidden="true" />{publishedDate}</> : "NYC Cleaning insights"}
-        </p>
-        <h2><Link href={article.path}>{articleTitle}</Link></h2>
-        <p className="article-card-excerpt">{article.description}</p>
-        <Link href={article.path} className="text-link">
-          Read article <ArrowRight size={16} aria-hidden="true" />
-        </Link>
-      </div>
-    </article>
-  );
-}
-
 function InsightServicesSection({ articleTitle }: { articleTitle?: string }) {
   return (
     <section className="section section-cream insights-services-section">
@@ -226,7 +203,7 @@ function BlogArchivePage({ content, databaseArticles }: { content: LegacyContent
   return <>
     <ClientLegacyHead content={content} />
     <section className="interior-hero legal insights-hero"><div className="container interior-hero-grid"><div><p className="eyebrow light">NYC Cleaning and Maintenance</p><h1>{title}</h1><p>{isMonthlyArchive ? "Browse practical guidance published during this month." : "Practical strategies, industry trends, and expert guidance designed to help property managers, landlords, and facility teams elevate their operations across New York City."}</p></div></div></section>
-    <section className="section insights-archive-section" id="insights-articles"><div className="container"><div className="section-heading split"><div><p className="eyebrow">{isMonthlyArchive ? "Archive" : "Latest insights"}</p><h2>{isMonthlyArchive ? sourceTitle : "Explore every recent article."}</h2></div><p>{isMonthlyArchive ? "Select an article to read the full guidance." : "Read the latest guidance and property-care strategies from the NYC Cleaning team."}</p></div>{articles.length ? <><div className="article-grid">{pageArticles.map((article, index) => <ArticleCard key={article.path} article={article} index={index} />)}</div>{totalPages > 1 && <nav className="insights-pagination" aria-label="Insights pages"><p className="insights-pagination-summary">Browse more property-care guidance.</p><div className="insights-pagination-controls"><button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><ArrowLeft size={16} aria-hidden="true" />Previous</button>{Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => <button type="button" className="pagination-button" key={pageNumber} onClick={() => changePage(pageNumber)} aria-current={currentPage === pageNumber ? "page" : undefined}>{pageNumber}</button>)}<button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>Next<ArrowRight size={16} aria-hidden="true" /></button></div></nav>}</> : <p className="archive-empty">New insights will appear here as soon as they are published.</p>}</div></section>
+    <section className="section insights-archive-section" id="insights-articles"><div className="container"><div className="section-heading split"><div><p className="eyebrow">{isMonthlyArchive ? "Archive" : "Latest insights"}</p><h2>{isMonthlyArchive ? sourceTitle : "Explore every recent article."}</h2></div><p>{isMonthlyArchive ? "Select an article to read the full guidance." : "Read the latest guidance and property-care strategies from the NYC Cleaning team."}</p></div>{articles.length ? <><div className="article-grid">{pageArticles.map(article => <ArticleCard key={article.path} article={article} />)}</div>{totalPages > 1 && <nav className="insights-pagination" aria-label="Insights pages"><p className="insights-pagination-summary">Browse more property-care guidance.</p><div className="insights-pagination-controls"><button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}><ArrowLeft size={16} aria-hidden="true" />Previous</button>{Array.from({ length: totalPages }, (_, index) => index + 1).map(pageNumber => <button type="button" className="pagination-button" key={pageNumber} onClick={() => changePage(pageNumber)} aria-current={currentPage === pageNumber ? "page" : undefined}>{pageNumber}</button>)}<button type="button" className="pagination-button pagination-button-direction" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>Next<ArrowRight size={16} aria-hidden="true" /></button></div></nav>}</> : <p className="archive-empty">New insights will appear here as soon as they are published.</p>}</div></section>
     {!isMonthlyArchive && <InsightServicesSection />}
   </>;
 }
