@@ -227,7 +227,15 @@ export async function listPublishedArticles() {
   if (!db) throw new Error("Database is not available");
   const now = new Date();
   return db
-    .select()
+    .select({
+      path: articles.path,
+      title: articles.title,
+      excerpt: articles.excerpt,
+      description: articles.description,
+      coverImageUrl: articles.coverImageUrl,
+      coverImageAlt: articles.coverImageAlt,
+      publishedAt: articles.publishedAt,
+    })
     .from(articles)
     .where(and(
       eq(articles.status, "published"),

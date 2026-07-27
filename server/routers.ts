@@ -39,6 +39,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { accountAdminProcedure, adminProcedure, publicProcedure, router } from "./_core/trpc";
 import { generateArticleCover } from "./articleCoverGeneration";
+import { createArticleCoverVariants } from "./articleCoverVariants";
 import { fallbackArticleCoverDescription, generateArticleCoverDescription } from "./articleImageDescription";
 import { generateArticleSeoFields } from "./articleSeoGeneration";
 import { generateArticleFromTopic } from "./articleGeneration";
@@ -730,6 +731,7 @@ export const appRouter = router({
         bytes,
         input.mimeType,
       );
+      await createArticleCoverVariants(result.key, bytes);
       return result;
     }),
     generateCover: adminProcedure.input(z.object({

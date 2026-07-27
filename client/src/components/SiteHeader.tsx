@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ChevronDown, Menu, Phone, X } from "lucide-react";
 import { brandAssets } from "@/content/assets";
+import { getResponsiveMedia } from "@/content/responsive-media";
 import { company, serviceGroups, serviceName } from "@/content/site";
 import { QuoteCta } from "./QuoteFormOverlay";
 
@@ -16,6 +17,7 @@ const mainLinks = [
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [location] = useLocation();
+  const logoMedia = getResponsiveMedia(brandAssets.logo);
 
   return (
     <header className="site-header">
@@ -27,7 +29,15 @@ export function SiteHeader() {
       </div>
       <div className="container nav-shell">
         <Link href="/" className="brand-link" aria-label="NYC Cleaning and Maintenance home">
-          <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" className="brand-logo" width={508} height={224} />
+          {logoMedia ? (
+            <picture className="responsive-picture">
+              <source type="image/avif" srcSet={logoMedia.avifSrcSet} sizes={logoMedia.sizes} />
+              <source type="image/webp" srcSet={logoMedia.fallbackSrcSet} sizes={logoMedia.sizes} />
+              <img src={brandAssets.logo} srcSet={logoMedia.fallbackSrcSet} sizes={logoMedia.sizes} alt="NYC Cleaning and Maintenance" className="brand-logo" width={508} height={224} decoding="async" />
+            </picture>
+          ) : (
+            <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" className="brand-logo" width={508} height={224} decoding="async" />
+          )}
         </Link>
 
         <nav className="desktop-nav" aria-label="Primary navigation">

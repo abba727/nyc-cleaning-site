@@ -2,6 +2,7 @@
  * Image generation helper using the built-in ImageService when available, with
  * a Vertex AI Gemini native-image fallback for production Cloud Run deployments.
  */
+import { createArticleCoverVariants } from "server/articleCoverVariants";
 import { storagePut } from "server/storage";
 import { ENV } from "./env";
 
@@ -87,7 +88,9 @@ const saveGeneratedImage = async (base64Data: string, mimeType: string) => {
   }
 
   const extension = mimeType === "image/jpeg" ? "jpg" : "png";
-  return storagePut(`generated/${Date.now()}.${extension}`, buffer, mimeType);
+  const stored = await storagePut(`generated/${Date.now()}.${extension}`, buffer, mimeType);
+  await createArticleCoverVariants(stored.key, buffer);
+  return stored;
 };
 
 const generateWithForge = async (

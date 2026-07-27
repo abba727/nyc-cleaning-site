@@ -118,6 +118,26 @@ export async function storagePut(
   return { key, url: publicMediaUrlForKey(key) };
 }
 
+/**
+ * Persists a derivative beside an already versioned original object. Callers
+ * must only use this with a source key that already includes a content hash.
+ */
+export async function storagePutAtKey(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  contentType = "application/octet-stream",
+): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+
+  if (ENV.gcsBucket) {
+    await putToGoogleCloudStorage(key, data, contentType);
+  } else {
+    await putToLegacyStorage(key, data, contentType);
+  }
+
+  return { key, url: publicMediaUrlForKey(key) };
+}
+
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
   return { key, url: publicMediaUrlForKey(key) };

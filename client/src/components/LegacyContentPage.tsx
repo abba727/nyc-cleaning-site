@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { ArrowLeft, ArrowRight, CalendarDays, ShieldCheck } from "lucide-react";
 import { brandAssets } from "@/content/assets";
-import { getResponsiveMedia } from "@/content/responsive-media";
+import { getArticleCoverResponsiveMedia, getResponsiveMedia } from "@/content/responsive-media";
 import { company, featuredServices, getPageImage, isBlogArchivePath, normalizePath, serviceName, siteOrigin, type LegacyContent, type SitePage } from "@/content/site";
 import { useLegacyContent } from "@/contexts/LegacyContentContext";
 import { ClientDataProvider } from "./ClientDataProvider";
@@ -25,8 +25,8 @@ export function databaseArticleToView(article: {
   title: string;
   excerpt: string | null;
   description: string;
-  body: LegacyContent["blocks"] | null;
-  blocks: LegacyContent["blocks"];
+  body?: LegacyContent["blocks"] | null;
+  blocks?: LegacyContent["blocks"];
   coverImageUrl: string;
   coverImageAlt: string;
   publishedAt: Date | string | null;
@@ -36,7 +36,7 @@ export function databaseArticleToView(article: {
     path: article.path,
     title: article.title,
     description: article.excerpt || article.description,
-    blocks: article.body?.length ? article.body : article.blocks,
+    blocks: article.body?.length ? article.body : (article.blocks || []),
     publishedAt: article.publishedAt ? (typeof article.publishedAt === "string" ? article.publishedAt.slice(0, 10) : article.publishedAt.toISOString().slice(0, 10)) : "",
     sourceUrl: "",
     coverImageUrl: article.coverImageUrl,
@@ -90,7 +90,17 @@ function ArticleImage({
   const { payload } = useLegacyContent();
   const image = content.coverImageUrl || payload?.images[normalizePath(content.path)]?.src || brandAssets.commercialCleaning;
   const alt = content.coverImageAlt || payload?.images[normalizePath(content.path)]?.alt || `NYC Cleaning insight: ${content.title}`;
-  return <img src={image} alt={alt} loading={loading} fetchPriority={fetchPriority} decoding="async" />;
+  const responsiveMedia = getArticleCoverResponsiveMedia(image);
+
+  if (!responsiveMedia) {
+    return <img src={image} alt={alt} width={1200} height={800} loading={loading} fetchPriority={fetchPriority} decoding="async" />;
+  }
+
+  return <picture className="responsive-picture">
+    <source type="image/avif" srcSet={responsiveMedia.avifSrcSet} sizes={responsiveMedia.sizes} />
+    <source type="image/webp" srcSet={responsiveMedia.fallbackSrcSet} sizes={responsiveMedia.sizes} />
+    <img src={image} srcSet={responsiveMedia.fallbackSrcSet} sizes={responsiveMedia.sizes} alt={alt} width={1200} height={800} loading={loading} fetchPriority={fetchPriority} decoding="async" />
+  </picture>;
 }
 
 function ServiceHighlightImage({ service }: { service: SitePage }) {
@@ -110,11 +120,11 @@ function ServiceHighlightImage({ service }: { service: SitePage }) {
 export function ArticleCard({ article, index }: { article: ArticleView; index?: number }) {
   const publishedDate = formatPublicationDate(article.publishedAt);
   const articleTitle = article.title.replace(/\s*[|–-]\s*NYC Cleaning.*$/i, "");
-  const isEager = typeof index === "number" && index < 3;
+  void index;
   return (
     <article className="article-card">
       <Link href={article.path} className="article-card-image" aria-label={`Read ${articleTitle}`}>
-        <ArticleImage content={article} loading={isEager ? "eager" : "lazy"} fetchPriority={isEager ? "high" : "auto"} />
+        <ArticleImage content={article} loading="lazy" fetchPriority="low" />
         <span className="article-card-image-shade" aria-hidden="true" />
       </Link>
       <div className="article-card-body">

@@ -1,9 +1,9 @@
-import { type ImgHTMLAttributes, useEffect, useState } from "react";
+import { lazy, Suspense, type ImgHTMLAttributes, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowRight, BadgeCheck, Building2, CheckCircle2, Clock3, MapPin, ShieldCheck, Sparkles, Users } from "lucide-react";
 import { InquiryForm } from "./InquiryForm";
 import { QuoteCta } from "./QuoteFormOverlay";
-import { MapView } from "./Map";
+const LazyMapView = lazy(() => import("./Map").then(module => ({ default: module.MapView })));
 import { ClientDataProvider } from "./ClientDataProvider";
 import LegacyContentPage, { ArticleCard, databaseArticleToView } from "./LegacyContentPage";
 import { trpc } from "@/lib/trpc";
@@ -19,8 +19,8 @@ export type InitialPublishedArticle = {
   title: string;
   excerpt: string | null;
   description: string;
-  body: LegacyContent["blocks"] | null;
-  blocks: LegacyContent["blocks"];
+  body?: LegacyContent["blocks"] | null;
+  blocks?: LegacyContent["blocks"];
   coverImageUrl: string;
   coverImageAlt: string;
   publishedAt: Date | string | null;
@@ -66,14 +66,14 @@ function TrustStrip() {
 
 function HomePage({ page, initialInsights }: { page: SitePage; initialInsights?: InitialPublishedArticle[] }) {
   const { payload } = useLegacyContent();
-  const publishedQuery = trpc.article.listPublished.useQuery(undefined, { retry: false });
-  const staticArticles = payload?.content.filter(item => item.kind === "article") || [];
   const initialInsightArticles = initialInsights?.map(databaseArticleToView) || [];
-  const insightSource = publishedQuery.data?.length
-    ? publishedQuery.data.map(databaseArticleToView)
-    : initialInsightArticles.length
-      ? initialInsightArticles
-      : [...staticArticles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+  const staticArticles = payload?.content.filter(item => item.kind === "article") || [];
+  // Homepage cards are delivered by SSR when the CMS is available. Falling back
+  // to static content avoids reintroducing a large article-list API request into
+  // the critical client-side dependency chain if the server lookup times out.
+  const insightSource = initialInsightArticles.length
+    ? initialInsightArticles
+    : [...staticArticles].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   const latestInsights = insightSource.slice(0, 3);
   return <>
     <section className="home-hero">
@@ -283,14 +283,16 @@ function ServiceAreaMap() {
   }
 
   return <div className="map-container" style={{ borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--border)", background: "var(--background)", minHeight: "600px", position: "relative" }}>
-    <MapView
-      className="h-[600px]"
-      googleMapsApiKey={mapConfig.data?.googleMapsApiKey}
-      initialCenter={[40.7128, -74.0060]}
-      initialZoom={11}
-      markers={markers}
-      onMapError={() => setMapTilesUnavailable(true)}
-    />
+    <Suspense fallback={<div className="h-[600px] w-full" aria-label="Loading service-area map" role="status" />}>
+      <LazyMapView
+        className="h-[600px]"
+        googleMapsApiKey={mapConfig.data?.googleMapsApiKey}
+        initialCenter={[40.7128, -74.0060]}
+        initialZoom={11}
+        markers={markers}
+        onMapError={() => setMapTilesUnavailable(true)}
+      />
+    </Suspense>
     <div className="absolute bottom-4 left-4 right-4 max-w-xl rounded-xl border border-white/80 bg-white/95 px-4 py-3 text-sm text-slate-700 shadow-lg backdrop-blur sm:left-6 sm:right-auto">
       <div className="flex items-start gap-2"><MapPin className="mt-0.5 size-4 shrink-0 text-brand-gold" /><span>{mapMessage}</span></div>
     </div>

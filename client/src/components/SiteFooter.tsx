@@ -1,15 +1,26 @@
 import { Link } from "wouter";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { brandAssets } from "@/content/assets";
+import { getResponsiveMedia } from "@/content/responsive-media";
 import { company, services, serviceName } from "@/content/site";
 import { QuoteCta } from "./QuoteFormOverlay";
 
 export function SiteFooter() {
+  const logoMedia = getResponsiveMedia(brandAssets.logo);
+
   return (
     <footer className="site-footer">
       <div className="container footer-grid">
         <div className="footer-brand">
-          <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" />
+          {logoMedia ? (
+            <picture className="responsive-picture">
+              <source type="image/avif" srcSet={logoMedia.avifSrcSet} sizes={logoMedia.sizes} />
+              <source type="image/webp" srcSet={logoMedia.fallbackSrcSet} sizes={logoMedia.sizes} />
+              <img src={brandAssets.logo} srcSet={logoMedia.fallbackSrcSet} sizes={logoMedia.sizes} alt="NYC Cleaning and Maintenance" width={508} height={224} decoding="async" />
+            </picture>
+          ) : (
+            <img src={brandAssets.logo} alt="NYC Cleaning and Maintenance" width={508} height={224} decoding="async" />
+          )}
           <p>Professional cleaning, porter, staffing, and building maintenance services tailored to properties across New York City.</p>
           <div className="footer-contact">
             <a href={`tel:${company.phoneHref}`}><Phone size={17} aria-hidden="true" /> {company.phoneDisplay}</a>

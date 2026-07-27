@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type * as Leaflet from "leaflet";
 import { cn } from "@/lib/utils";
 
+// Keep map-only styling out of the initial public CSS while avoiding a CSS
+// module import during Node server rendering.
+if (typeof window !== "undefined") {
+  void import("leaflet/dist/leaflet.css");
+}
+
 export type MapMarker = {
   id: number;
   latitude: number;
